@@ -33,7 +33,9 @@ export type LifeEvent =
   /** `run: false` hanya menurunkan pin usulan (dipakai bila konvoinya datang dari kejadian `Rebalanced` yang menyusul). */
   | { type: "approve"; id: string; run?: boolean }
   /** Kembang api di atas alun-alun (karya sipil pilihan walikota). */
-  | { type: "fireworks" };
+  | { type: "fireworks" }
+  /** Kerja walikota lain yang tercatat onchain: kunci wakil, fee, buka rencana, sewa atau cabut staf AI. */
+  | { type: "agenda"; kind: "deputy" | "fee" | "reveal" | "hire" | "fire" | "seal"; text: string };
 
 export interface Floater {
   id: string;
@@ -561,6 +563,7 @@ export class CityLife {
       case "propose": this.propose(ev.id, ev.from, ev.to, ev.amount); break;
       case "approve": this.approve(ev.id, ev.run !== false); break;
       case "fireworks": this.fireworks(); break;
+      case "agenda": { const dep = this.depotOf("idle"); if (dep) { this.makeEvent("note", dep, ev.kind === "fire" ? TONE_HEX.amber : TONE_HEX.gold, 6, ev.text, ev.kind === "fire" ? "amber" : "gold"); this.ring(dep.x, dep.z, TONE_HEX.gold, 4, 26, 1.8); } break; }
     }
   }
 

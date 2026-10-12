@@ -111,9 +111,19 @@ export default function AccountMenu({ onAfterChange }: { onAfterChange?: () => v
               </button>
             </div>
             {msg && <div className="mt-3"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
+            <div className="mt-3 rounded-xl bg-slate-900/[0.04] p-2.5 text-[11px] leading-snug text-ink-soft">
+              <div className="mb-1 font-semibold uppercase tracking-wide text-ink">Keys in this session</div>
+              <ul className="space-y-0.5">
+                <li><b className="text-ink">Account</b> · signs deposits and approvals without a prompt</li>
+                <li><b className="text-ink">Deputy key</b> {w.deputy ? <code>{shortAddr(w.deputy)}</code> : null} · may only move funds between districts, within limits</li>
+                <li><b className="text-ink">Strategy book</b> · {w.bookUnlocked ? "unlocked (separate passkey namespace)" : "locked"}</li>
+              </ul>
+              <div className="mt-1.5">A fresh passkey prompt is always needed to withdraw, change the deputy key, or hire and release AI staff. Keys live only in this page&apos;s memory and are wiped when it locks.</div>
+            </div>
             <div className="mt-3 flex items-center justify-between border-t border-slate-900/5 pt-3 text-xs text-ink-soft">
               <span className={cx("inline-flex items-center gap-1")}><IconLock width={13} height={13} /> Locks in {mmss(w.secondsLeft)}</span>
               <span className="flex gap-3">
+                <button className="font-medium hover:text-ink" onClick={() => { w.lock(); setOpen(false); }}>Lock now</button>
                 <button className="font-medium hover:text-ink" onClick={() => { w.signOut(); setOpen(false); }}>Sign out</button>
               </span>
             </div>

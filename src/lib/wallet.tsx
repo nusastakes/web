@@ -19,6 +19,8 @@ import type { Hex } from "./types";
  *   `rebalance` dalam batas dan masa berlaku, jadi sesi walikota bisa menata ulang tanpa prompt. Di perangkat baru kunci
  *   yang sama diturunkan ulang. Catatan jujur: sesi halaman v1 masih memegang kunci utama juga (untuk permit setor).
  * - Tidak ada rahasia di localStorage; hanya id credential dan alamat terakhir (metadata publik).
+ * - Buku strategi memakai namespace PRF sendiri (salt `sha256("nusastakes/buku-strategi/v1")`), terpisah dari akun. Kuncinya
+ *   hanya ada di memori selama sesi dan dibuang saat sesi dikunci; tidak pernah disimpan atau dikirim.
  */
 
 const STORE_KEY = "nusastakes.credential.v1";
@@ -79,6 +81,8 @@ export interface WalletApi {
   createAccount: () => Promise<void>;
   signIn: () => Promise<void>;
   signOut: () => void;
+  /** Mengakhiri sesi sekarang (kunci dihapus dari memori); akun tetap diingat. */
+  lock: () => void;
   clearError: () => void;
   /** Menandatangani EIP-712 dengan sesi yang hidup (tanpa prompt). Gagal bila terkunci. */
   signTypedData: LocalAccount["signTypedData"];
@@ -90,6 +94,16 @@ export interface WalletApi {
   deputy?: Hex;
   /** Mengirim transaksi dengan kunci wakil (tanpa prompt). Hanya `rebalance` yang diterima vault dari kunci ini. */
   sendAsDeputy: (tx: TxRequest) => Promise<Hex>;
+  /** Kunci induk buku strategi sudah dibuka di sesi ini. */
+  bookUnlocked: boolean;
+  /** Menjalankan `fn` dengan kunci induk buku strategi (32 byte). Membuka kunci butuh satu ceremony bila belum. */
+  withBookKey: <T>(fn: (root: Uint8Array) => Promise<T>) => Promise<T>;
+}
+
+/** Salt PRF buku strategi: namespace terpisah dari akun (salt Mera bawaan). */
+async function bookSalt(): Promise<Uint8Array<ArrayBuffer>> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("nusastakes/buku-strategi/v1"));
+  return new Uint8Array(d);
 }
 
 const Ctx = createContext<WalletApi | null>(null);
@@ -155,6 +169,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const accountRef = useRef<LocalAccount | null>(null);
   const deputySessionRef = useRef<Secp256k1SigningSession | null>(null);
   const deputyAccountRef = useRef<LocalAccount | null>(null);
+  const bookRef = useRef<Uint8Array | null>(null);
+  const [bookUnlocked, setBookUnlocked] = useState(false);
   const lastUsed = useRef(0);
   const touch = () => { lastUsed.current = Date.now(); };
 
@@ -165,6 +181,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     accountRef.current = null;
     deputySessionRef.current = null;
     deputyAccountRef.current = null;
+    bookRef.current?.fill(0);
+    bookRef.current = null;
+    setBookUnlocked(false);
   }, []);
 
   const startFrom = useCallback(async (prfOutput: Uint8Array, cred: StoredCredential) => {
@@ -241,6 +260,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     writeStored(undefined, undefined);
   }, [endSession]);
 
+  const lock = useCallback(() => {
+    endSession();
+    setPhase("idle");
+    setDeputyAddress(undefined);
+    setSecondsLeft(undefined);
+  }, [endSession]);
+
   const signTypedData: LocalAccount["signTypedData"] = useCallback(async (...args) => {
     const account = accountRef.current;
     if (!account) throw Object.assign(new Error("session ended"), { code: "SESSION_ENDED" });
@@ -282,6 +308,29 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const sendTransaction = useCallback((tx: TxRequest) => sendWith(accountRef.current, tx), [sendWith]);
   const sendAsDeputy = useCallback((tx: TxRequest) => sendWith(deputyAccountRef.current, tx), [sendWith]);
 
+  const withBookKey = useCallback(async <T,>(fn: (root: Uint8Array) => Promise<T>): Promise<T> => {
+    if (!accountRef.current) throw Object.assign(new Error("session ended"), { code: "SESSION_ENDED" });
+    if (!bookRef.current) {
+      const { getPasskeyPrfOutput } = await import("@category-labs/mera");
+      const known = readStored();
+      setBusyLabel("Unlock your strategy book with your passkey…");
+      try {
+        const got = await getPasskeyPrfOutput({
+          rpId: location.hostname,
+          credential: known ? { credentialId: known.credentialId, transports: known.transports } : undefined,
+          prfSalt: await bookSalt(),
+        });
+        markCeremony();
+        bookRef.current = new Uint8Array(got.prfOutput);
+        setBookUnlocked(true);
+      } finally {
+        setBusyLabel(undefined);
+      }
+    }
+    touch();
+    return fn(bookRef.current!);
+  }, []);
+
   const status: WalletStatus = phase === "busy" ? "busy" : phase === "ready" ? "ready" : storedAddress ? "locked" : "out";
 
   const value = useMemo<WalletApi>(
@@ -289,9 +338,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       status, address, hasPasskey, busyLabel, error,
       secondsLeft: status === "ready" ? secondsLeftState : undefined,
       deputy: status === "ready" ? deputyAddress : undefined,
-      createAccount, signIn, signOut, clearError: () => setError(undefined), signTypedData, withCeremony, sendTransaction, sendAsDeputy,
+      createAccount, signIn, signOut, lock, clearError: () => setError(undefined), signTypedData, withCeremony, sendTransaction, sendAsDeputy,
+      bookUnlocked: status === "ready" && bookUnlocked, withBookKey,
     }),
-    [status, address, hasPasskey, busyLabel, error, secondsLeftState, deputyAddress, createAccount, signIn, signOut, signTypedData, withCeremony, sendTransaction, sendAsDeputy],
+    [status, address, hasPasskey, busyLabel, error, secondsLeftState, deputyAddress, createAccount, signIn, signOut, lock, signTypedData, withCeremony, sendTransaction, sendAsDeputy, bookUnlocked, withBookKey],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

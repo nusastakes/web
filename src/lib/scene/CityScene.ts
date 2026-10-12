@@ -917,6 +917,7 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       case "festival": item = { kind: "festival", text: ev.label ?? `Mayor hosts an event at ${label(ev.at)}`, at, district: ev.at }; break;
       case "deposit": item = { kind: "deposit", text: `A resident deposits ${amt(ev.amount)} AUSD`, at }; break;
       case "withdraw": item = { kind: "withdraw", text: `A resident withdraws ${amt(ev.amount)} AUSD`, at }; break;
+      case "agenda": item = { kind: ev.kind, text: ev.text, at }; break;
     }
     if (item) { this.agenda.push(item); if (this.agenda.length > 20) this.agenda.shift(); }
   }

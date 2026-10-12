@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { writeEntry } from "@/lib/book";
+import BookPanel from "./BookPanel";
+import StaffPanel from "./StaffPanel";
 import { DEFAULT_STYLE, THEMES, THEME_IDS, WORKS, developmentOf, fundsForDevelopment, type CityStyle, type WorkId } from "@/lib/scene/themes";
 import { REBALANCE_STEPS, DEPUTY_STEPS, planHashOf, rebalanceFlow, setDeputyFlow, type Slot, type Step } from "@/lib/actions";
 import { humanError } from "@/lib/errors";
@@ -47,6 +50,8 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const [error, setError] = useState<string | null>(null);
   const [gasBusy, setGasBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [seal, setSeal] = useState(true);
+  const [tab, setTab] = useState<"funds" | "book" | "staff" | "design">("funds");
 
   const deputyActive = !!state?.deputy && !!w.deputy && state.deputy.address.toLowerCase() === w.deputy.toLowerCase();
   const signer = deputyActive ? w.deputy : w.address;
@@ -68,11 +73,23 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const move = async () => {
     if (!w.address || !city.vault || !from || !to) return;
     setError(null); setDone(null);
-    setSteps(REBALANCE_STEPS.map((s) => ({ ...s })));
+    const sealing = seal && note.trim().length > 0;
+    const base = REBALANCE_STEPS.map((s) => ({ ...s }));
+    setSteps(sealing ? [{ id: "seal", label: "Seal your reasoning in the strategy book", state: "todo" }, ...base] : base);
     try {
+      // Buku strategi tersegel: alasan dienkripsi di perangkat, hanya hash ciphertext yang ikut ke rantai.
+      let planHash = planHashOf(note);
+      if (sealing) {
+        reportR("seal", { state: "active", detail: w.bookUnlocked ? undefined : "Unlock the book with your passkey" });
+        const sealed = await writeEntry(w, w.address, {
+          v: 1, city: city.vault, cityName: city.name, from: from.label, to: to.label, amount: ausd(amount), note: note.trim(),
+        });
+        planHash = sealed.planHash;
+        reportR("seal", { state: "done", detail: `Sealed · ${planHash.slice(0, 10)}…` });
+      }
       await rebalanceFlow({
         wallet: w, useDeputy: deputyActive, report: reportR,
-        input: { vault: city.vault, owner: w.address, from: from.address, to: to.address, amount, planHash: planHashOf(note) },
+        input: { vault: city.vault, owner: w.address, from: from.address, to: to.address, amount, planHash },
       });
       setDone(`Moved ${ausd(amount)} AUSD from ${from.label} to ${to.label}.`);
       setNote("");
@@ -103,13 +120,24 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const expiry = state?.deputy ? new Date(state.deputy.expiry * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <Sheet title={`Manage ${city.name}`} subtitle="Move funds between districts. The contract never lets you send them to your own wallet." onClose={onClose}>
+    <Sheet title={`City hall · ${city.name}`} subtitle="Run your city: move funds, keep a sealed strategy book, hire AI staff, and design the city. The contract never lets you send funds to your own wallet." onClose={onClose}>
       {city.preview || !city.vault ? <Notice tone="warn">This is a preview city. Found your own city to manage it.</Notice>
         : !ready ? <NeedAccount />
         : !isMayor ? <Notice tone="info">Only the mayor of this city can manage it. Found your own city from the dock.</Notice>
         : !state ? <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> Reading the city…</div>
         : (
           <div className="space-y-4">
+            <div className="flex gap-1 rounded-xl bg-slate-900/5 p-1" role="tablist">
+              {(["funds", "book", "staff", "design"] as const).map((k) => (
+                <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold capitalize ${tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>
+                  {k === "book" ? "Strategy book" : k === "staff" ? "AI staff" : k}
+                </button>
+              ))}
+            </div>
+            {tab === "book" && <BookPanel city={city} />}
+            {tab === "staff" && <StaffPanel city={city} onDone={onDone} />}
+            {tab === "funds" && <>
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Move funds</h3>
@@ -132,8 +160,12 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
               </Field>
               <p className="text-[11px] leading-relaxed text-ink-soft">One change can move at most {fmtBps(limitBps)} of the city ({ausd(cap)} AUSD from here).</p>
               <Field label="Your reasoning (optional)">
-                <textarea className={`${inputCls} min-h-[60px] resize-none`} value={note} maxLength={280} onChange={(e) => setNote(e.target.value)} placeholder="Why this move? Only its fingerprint goes on-chain." disabled={busy} />
+                <textarea className={`${inputCls} min-h-[60px] resize-none`} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} placeholder="Why this move? Write it before the result is known." disabled={busy} />
               </Field>
+              <label className="flex items-start gap-2 text-[11px] leading-snug text-ink-soft">
+                <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={seal} onChange={(e) => setSeal(e.target.checked)} disabled={busy} />
+                <span><b className="text-ink">Seal it in your strategy book.</b> Encrypted on this device with a key from your passkey; only its fingerprint goes on-chain. You can reveal it at the end of the season to prove you called it in advance.</span>
+              </label>
               {lowGas && (
                 <Notice tone="info">
                   <div className="flex items-center justify-between gap-3">
@@ -165,7 +197,8 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                 {state.deputy && <button className="btn btn-ghost" disabled={busy} onClick={() => setDeputy(false)}>Remove</button>}
               </div>
             </section>
-            <section className="space-y-2 border-t border-slate-900/5 pt-3">
+            </>}
+            {tab === "design" && <section className="space-y-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">City design</h3>
               <p className="text-xs leading-relaxed text-ink-soft">Make your city beautiful. This is looks only: it never changes residents&apos; money. Bigger cities unlock more civic works.</p>
               <div className="flex flex-wrap gap-1.5">
@@ -195,7 +228,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                 {styleSync === "shared" ? "Saved for everyone: residents see this look when they open the city." : styleSync === "saving" ? "Saving for everyone…" : styleSync === "error" ? `Saved in this browser only (${styleError ?? "relayer error"}).` : "Saved in this browser."}
                 {styleCode && <> Preview link: <code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code></>}
               </p>
-            </section>
+            </section>}
             {error && <Notice tone="error">{error}</Notice>}
           </div>
         )}

@@ -9,10 +9,11 @@ import type { LifeEvent } from "./scene/life";
 import type { Hex } from "./types";
 
 const POLL_MS = 2500;
-/** Satu permintaan log tidak pernah lebih lebar dari ini, supaya RPC publik tidak menolak setelah tab lama di latar. */
-const MAX_SPAN = 400n;
+/** RPC publik Monad menolak `getLogs` lebih dari 100 blok (HTTP 413), jadi satu permintaan paling banyak 100 blok. */
+const MAX_SPAN = 99n;
 const district = (a: string) => (a.toLowerCase() === zeroAddress ? "idle" : a);
 const ausd = (raw: bigint) => Number(raw) / 1e6;
+const ROLE_NAMES: Record<number, string> = { 1: "Satpam (AI guard)", 2: "Analyst (AI)", 3: "Humas (AI reporter)" };
 
 /**
  * Mengubah kejadian onchain milik satu kota menjadi kejadian visual di kota 3D: setor, tarik, tata ulang, fee,
@@ -32,6 +33,8 @@ export function useCityActivity(vault: Hex | undefined, emit: (e: LifeEvent) => 
         const head = await publicClient.getBlockNumber();
         if (cursor === undefined) { cursor = head; return; }
         if (head <= cursor) return;
+        // Tab yang lama di latar: lewati jauh ke belakang, cukup kejadian beberapa menit terakhir.
+        if (head - cursor > 1500n) cursor = head - 300n;
         const to = head - cursor > MAX_SPAN ? cursor + MAX_SPAN : head;
         const [v, g] = await Promise.all([
           publicClient.getLogs({ address: vault, events: vaultAbi.filter((x) => x.type === "event"), fromBlock: cursor + 1n, toBlock: to }),
@@ -55,6 +58,21 @@ export function useCityActivity(vault: Hex | undefined, emit: (e: LifeEvent) => 
               break;
             case "ProposalApproved":
               if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "approve", id: String(args.id), run: false });
+              break;
+            case "SessionKeySet":
+              emitRef.current({ type: "agenda", kind: "deputy", text: (args.sessionKey as string).toLowerCase() === zeroAddress ? "Mayor removes the deputy key" : "Mayor registers a deputy key for day-to-day work" });
+              break;
+            case "FeeSet":
+              emitRef.current({ type: "agenda", kind: "fee", text: `Mayor changes the fee to ${(Number(args.newFeeBps) / 100).toFixed(1)}%` });
+              break;
+            case "PlanKeyRevealed":
+              emitRef.current({ type: "agenda", kind: "reveal", text: "Mayor reveals a sealed plan from the strategy book" });
+              break;
+            case "AgentGranted":
+              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "hire", text: `Mayor hires the ${ROLE_NAMES[Number(args.role)] ?? "AI staff"}` });
+              break;
+            case "AgentRevoked":
+              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "fire", text: "Mayor releases an AI staff member" });
               break;
           }
         }

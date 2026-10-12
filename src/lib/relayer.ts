@@ -39,6 +39,27 @@ export const requestGas = (address: Hex) => call<{ hash: Hex; amountWei: string 
 export const getCityStyle = (vault: Hex) => call<{ code: string; nonce: string }>(`/style/${vault}`);
 export const postCityStyle = (p: { vault: Hex; code: string; nonce: string; signature: Hex }) => call<{ vault: Hex; code: string; nonce: string }>("/style", p);
 
+// --- Buku strategi (ciphertext saja; relayer tidak bisa membacanya) ----------------------------------------------
+export interface BookMeta { id: string; hash: Hex; bytes: number; createdAt: number }
+export const getBook = (owner: Hex) => call<{ owner: Hex; nonce: string; entries: BookMeta[] }>(`/book/${owner}`);
+export const getBookEntry = (owner: Hex, id: string) => call<BookMeta & { ciphertext: Hex }>(`/book/${owner}/${encodeURIComponent(id)}`);
+export const putBook = (p: { owner: Hex; id: string; ciphertext: Hex; nonce: string; signature: Hex }) => call<BookMeta & { owner: Hex; nonce: string }>("/book", p);
+
+// --- Staf AI, Analis, laporan, papan peringkat ------------------------------------------------------------------
+export interface AgentInfo { id: "satpam" | "analis" | "humas"; name: string; role: number; roleName: string; address: Hex | null; kind: string; status: string; description: string }
+export const getAgents = () => call<{ guardian: Hex; agents: AgentInfo[] }>("/agents");
+export interface ProposalInfo {
+  proposalId: string; planHash: Hex; txHash?: Hex; status: "pending" | "approved" | "expired" | string;
+  plan?: { from?: string; to?: string; amount?: string; reason?: string; [k: string]: unknown };
+  [k: string]: unknown;
+}
+export const getProposals = (city: Hex) => call<{ city: Hex; analyst: Hex; proposals: ProposalInfo[] }>(`/proposals/${city}`);
+export const runAnalyst = (city: Hex) => call<{ status: string; [k: string]: unknown }>("/analyst/run", { city });
+export const getReport = (city: Hex, days = 7) => call<{ text?: string; title?: string; [k: string]: unknown }>(`/report/${city}?days=${days}`);
+export interface LeaderRow { rank: number | null; ranked: boolean; vault: Hex; name: string; community: string; mayor: Hex; tvl: string; returnBps: number; pricePerShare: string; residents: number; createdAt: number }
+export const getLeaderboard = () => call<{ asOf: number; minRankedTvl: string; cities: LeaderRow[] }>("/leaderboard");
+export const getEconomy = () => call<Record<string, unknown>>("/economy");
+
 export interface PermitSig { v: number; r: Hex; s: Hex }
 
 export const relayDeposit = (p: { vault: Hex; owner: Hex; assets: bigint; deadline: bigint } & PermitSig) =>

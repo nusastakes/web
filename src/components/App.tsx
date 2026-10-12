@@ -33,7 +33,9 @@ function Shell() {
   const [recenter, setRecenter] = useState(0);
 
   const all = useMemo(() => [...cities, ...PREVIEW_CITIES], [cities]);
-  const current = all.find((c) => c.id === pickedId) ?? cities[0] ?? PREVIEW_CITIES[0];
+  // Walikota yang masuk langsung melihat kotanya sendiri (kota terbaru bila punya beberapa), kecuali memilih kota lain.
+  const mine = wallet.address ? [...cities].reverse().find((c) => c.mayor?.toLowerCase() === wallet.address!.toLowerCase()) : undefined;
+  const current = all.find((c) => c.id === pickedId) ?? mine ?? cities[0] ?? PREVIEW_CITIES[0];
 
   const isMayor = wallet.status === "ready" && !!current.mayor && current.mayor.toLowerCase() === wallet.address?.toLowerCase();
 

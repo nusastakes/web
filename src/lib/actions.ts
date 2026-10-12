@@ -269,3 +269,45 @@ export const DEPUTY_STEPS: Step[] = [
   { id: "send", label: "Sent to Monad", state: "todo" },
   { id: "confirm", label: "Deputy key updated", state: "todo" },
 ];
+
+// ---------------------------------------------------------------------------------------------------------------
+// Transaksi walikota umum: dengan sesi (tanpa prompt) atau dengan ceremony baru (ubah izin dan pengaturan, PRD B16).
+// ---------------------------------------------------------------------------------------------------------------
+
+export interface ContractCall { address: Hex; abi: readonly unknown[]; functionName: string; args: readonly unknown[] }
+
+export async function contractTx(wallet: WalletApi, call: ContractCall, opts: { ceremony: boolean; label: string; report?: Report }): Promise<{ hash: Hex }> {
+  const { report } = opts;
+  report?.("sign", { state: "active", detail: opts.ceremony ? "Confirm with your passkey" : undefined });
+  const data = (encodeFunctionData as (p: { abi: readonly unknown[]; functionName: string; args: readonly unknown[] }) => Hex)({ abi: call.abi, functionName: call.functionName, args: call.args });
+  const build = async (from: Hex) => {
+    const [estimate, fees] = await Promise.all([
+      publicClient.estimateGas({ account: from, to: call.address, data }),
+      feeCaps(),
+    ]);
+    return { to: call.address, data, gas: (estimate * 125n) / 100n, ...fees };
+  };
+  let hash: Hex;
+  if (opts.ceremony) {
+    hash = await wallet.withCeremony(opts.label, async (account) => {
+      const { createWalletClient, http } = await import("viem");
+      return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction((await build(account.address)) as never);
+    });
+  } else {
+    if (!wallet.address) throw new Error("Sign in first.");
+    hash = await wallet.sendTransaction(await build(wallet.address));
+  }
+  report?.("sign", { state: "done", detail: undefined });
+  report?.("send", { state: "done", hash });
+  report?.("confirm", { state: "active" });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  report?.("confirm", { state: "done" });
+  return { hash };
+}
+
+export const TX_STEPS = (label: string): Step[] => [
+  { id: "sign", label: "Sign", state: "todo" },
+  { id: "send", label: "Sent to Monad", state: "todo" },
+  { id: "confirm", label, state: "todo" },
+];

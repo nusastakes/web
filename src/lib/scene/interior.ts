@@ -21,7 +21,7 @@ export type Program =
   | "mayor" | "council" | "aiStaff" | "service";
 
 export interface AgendaItem {
-  kind: "transfer" | "propose" | "approve" | "alert" | "harvest" | "festival" | "deposit" | "withdraw";
+  kind: "transfer" | "propose" | "approve" | "alert" | "harvest" | "festival" | "deposit" | "withdraw" | "deputy" | "fee" | "reveal" | "hire" | "fire" | "seal";
   text: string;
   /** Waktu kejadian (detik, jam dinding adegan). */
   at: number;
@@ -508,7 +508,7 @@ export class BuildingInterior {
   }
 
   private meetingActive(pr: Program): boolean {
-    if (pr === "council") return !!this.latest(["transfer", "propose", "approve", "alert"], 160) || (this.hour >= 9 && this.hour < 11);
+    if (pr === "council") return !!this.latest(["transfer", "propose", "approve", "alert", "reveal", "fee"], 160) || (this.hour >= 9 && this.hour < 11);
     const mine = this.agenda().some((a) => a.kind === "transfer" && a.district === this.brief.district.id && this.t - a.at < 160);
     return mine || (this.hour >= 10 && this.hour < 11.5) || (this.hour >= 14 && this.hour < 15);
   }
@@ -521,15 +521,24 @@ export class BuildingInterior {
         if (h < 7.5 || h >= 21) return "The mayor has gone home";
         if (this.recent("propose", 150)) return "The AI Analyst presents a proposal to the mayor";
         if (this.recent("alert", 90)) return "Satpam reports an evacuation to the mayor";
+        if (this.recent("seal", 120)) return "Mayor writes a sealed plan in the strategy book";
+        if (this.recent("reveal", 150)) return "Mayor reveals a sealed plan to the public";
+        if (this.recent("hire", 150)) return "Mayor welcomes new AI staff";
+        if (this.recent("deputy", 150)) return "Mayor hands day-to-day work to the deputy key";
+        if (this.recent("fee", 150)) return "Mayor sets a new fee for the city";
         return a ? `Mayor follows up: ${a.text}` : "Mayor reviews the city's allocation";
-      case "council": return this.meetingActive("council") ? `Council meeting: ${a ? a.text : "weekly city budget review"}` : "Empty, next meeting later";
+      case "council": {
+        const r = this.latest(["reveal"], 200);
+        if (r) return `Public session: ${r.text}`;
+        return this.meetingActive("council") ? `Council meeting: ${a ? a.text : "weekly city budget review"}` : "Empty, next meeting later";
+      }
       case "meeting": {
         // Hanya ruang rapat terbawah yang membahas dana baru; yang lain rapat tim biasa.
         const first = this.floors.find((f) => f.program === "meeting")?.level === level;
         const mine = this.agenda().filter((q) => q.kind === "transfer" && q.district === this.brief.district.id && this.t - q.at < 160).sort((p, q) => q.at - p.at)[0];
         return mine && first ? `Briefing on new funds: ${mine.text}` : this.meetingActive("meeting") ? (level % 2 ? "Team meeting" : "Client call") : "Empty";
       }
-      case "aiStaff": return this.recent("alert", 90) ? "Alarm: Satpam is evacuating a district" : this.recent("propose", 150) ? "Analyst drafted a proposal for the mayor" : "Satpam watches the protocols, Analyst models yields, Humas writes the weekly report";
+      case "aiStaff": return this.recent("hire", 150) ? "New AI staff setting up their desks" : this.recent("fire", 150) ? "An AI staff member packs up and leaves" : this.recent("alert", 90) ? "Alarm: Satpam is evacuating a district" : this.recent("propose", 150) ? "Analyst drafted a proposal for the mayor" : "Satpam watches the protocols, Analyst models yields, Humas writes the weekly report";
       case "service": return h >= 8 && h < 16 ? (this.recent("deposit", 120) || this.recent("withdraw", 120) ? "Busy: residents depositing and withdrawing" : "Residents asking about their savings") : "Closed";
       case "trading": return this.recent("transfer", 160) ? "Fund desk rebalancing the district" : `Watching ${this.brief.district.label} yields`;
       case "vault": return "Crates of AUSD held by this district";
