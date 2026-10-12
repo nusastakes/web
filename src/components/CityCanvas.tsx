@@ -1,0 +1,201 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CityScene, type LabelPosition } from "@/lib/scene/CityScene";
+import type { CityMap } from "@/lib/scene/geometry";
+import type { CityStats, Floater, Inspect, LifeEvent, Tone } from "@/lib/scene/life";
+import type { CityStyle } from "@/lib/scene/themes";
+import type { District } from "@/lib/types";
+import { DISTRICT_COLORS } from "@/lib/palette";
+
+/** Pintu masuk ke adegan untuk komponen lain: menjalankan kejadian dan menggerakkan kamera. */
+export interface SceneApi {
+  emit: (e: LifeEvent) => void;
+  setActivity: (v: number) => void;
+  focusDistrict: (id: string) => void;
+  setClockSpeed: (secondsPerHour: number) => void;
+  setHour: (h: number) => void;
+  setClockPaused: (p: boolean) => void;
+  clearInspect: () => void;
+}
+
+export interface CityTick { time: string; phase: string; hour: number; stats: CityStats }
+
+const TONE_CSS: Record<Tone, string> = { blue: "#3f6bff", green: "#10b981", amber: "#f59e0b", red: "#ef4444", violet: "#7a5cff", gold: "#f5b301" };
+
+interface Props {
+  mapId: string;
+  districts: District[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onMapLoaded?: (map: CityMap) => void;
+  /** Naikkan angka ini untuk mengembalikan kamera ke posisi awal. */
+  resetSignal?: number;
+  onScene?: (api: SceneApi | null) => void;
+  /** Gaya kota pilihan walikota (tema dan karya sipil). */
+  style?: CityStyle;
+  onTick?: (t: CityTick) => void;
+  onInspect?: (info: Inspect | null) => void;
+  /** Nama kota untuk layar LED di menara. */
+  cityName?: string;
+}
+
+const mapCache = new Map<string, CityMap>();
+
+async function loadMap(id: string): Promise<CityMap> {
+  const hit = mapCache.get(id);
+  if (hit) return hit;
+  const res = await fetch(`/maps/${id}.city.json`);
+  if (!res.ok) throw new Error(`peta ${id} tidak bisa dimuat (${res.status})`);
+  const map = (await res.json()) as CityMap;
+  mapCache.set(id, map);
+  return map;
+}
+
+/** Kota 3D. Adegan three.js hidup di dalam komponen ini; React hanya mengirim peta, distrik, dan pilihan. */
+export default function CityCanvas({ mapId, districts, selectedId, onSelect, onMapLoaded, resetSignal = 0, onScene, style, onTick, onInspect, cityName }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<CityScene | null>(null);
+  const labelRefs = useRef(new Map<string, HTMLDivElement>());
+  const floatersRef = useRef<HTMLDivElement>(null);
+  const chipsRef = useRef(new Map<string, HTMLDivElement>());
+  const onSceneRef = useRef(onScene);
+  const onTickRef = useRef(onTick);
+  const onInspectRef = useRef(onInspect);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedMap, setLoadedMap] = useState<string | null>(null);
+  const ready = loadedMap === mapId;
+  const [hovered, setHovered] = useState<string | null>(null);
+  const onSelectRef = useRef(onSelect);
+  const districtsRef = useRef(districts);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => { onSceneRef.current = onScene; }, [onScene]);
+  useEffect(() => { onTickRef.current = onTick; }, [onTick]);
+  useEffect(() => { onInspectRef.current = onInspect; }, [onInspect]);
+  useEffect(() => { districtsRef.current = districts; }, [districts]);
+
+  // Buat adegan sekali.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let scene: CityScene;
+    try {
+      scene = new CityScene(canvas, {
+        onHover: setHovered,
+        onSelect: (id) => onSelectRef.current(id),
+        onTick: (t) => onTickRef.current?.(t),
+        onInspect: (info) => onInspectRef.current?.(info),
+        onLabels: (labels: LabelPosition[]) => {
+          for (const l of labels) {
+            const el = labelRefs.current.get(l.id);
+            if (!el) continue;
+            el.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px) translate(-50%, -100%)`;
+            el.style.opacity = l.visible ? "1" : "0";
+          }
+        },
+        onFloaters: (items: Floater[]) => {
+          const host = floatersRef.current;
+          if (!host) return;
+          const chips = chipsRef.current;
+          const seen = new Set<string>();
+          for (const f of items) {
+            seen.add(f.id);
+            let el = chips.get(f.id);
+            if (!el) {
+              el = document.createElement("div");
+              el.className = "absolute left-0 top-0 whitespace-nowrap rounded-full border-2 bg-white px-2.5 py-1 text-[11px] font-bold text-ink shadow-[0_8px_22px_-8px_rgba(15,22,51,0.35)]";
+              el.style.borderColor = TONE_CSS[f.tone];
+              el.textContent = f.text;
+              host.appendChild(el);
+              chips.set(f.id, el);
+            }
+            el.style.transform = `translate(${f.x.toFixed(1)}px, ${(f.y - 8).toFixed(1)}px) translate(-50%, -100%)`;
+            el.style.opacity = f.visible ? "1" : "0";
+          }
+          for (const [id, el] of chips) if (!seen.has(id)) { el.remove(); chips.delete(id); }
+        },
+      });
+    } catch (e) {
+      // Tidak ada WebGL: tampilkan pesan, jangan merusak seluruh halaman.
+      const message = e instanceof Error ? e.message : "WebGL tidak tersedia";
+      queueMicrotask(() => setError(message));
+      return;
+    }
+    sceneRef.current = scene;
+    const chips = chipsRef.current;
+    onSceneRef.current?.({
+      emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), focusDistrict: (id) => scene.focusDistrict(id),
+      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(),
+    });
+    const shift = () => scene.setViewShift(window.innerWidth >= 768 ? 170 : 0);
+    shift();
+    window.addEventListener("resize", shift);
+    return () => {
+      window.removeEventListener("resize", shift);
+      onSceneRef.current?.(null);
+      for (const el of chips.values()) el.remove();
+      chips.clear();
+      scene.dispose();
+      sceneRef.current = null;
+    };
+  }, []);
+
+  // Muat peta saat berganti kota.
+  useEffect(() => {
+    let cancelled = false;
+    const scene = sceneRef.current;
+    if (!scene) return;
+    loadMap(mapId)
+      .then((map) => {
+        if (cancelled) return;
+        scene.setMap(map);
+        scene.setDistricts(districtsRef.current);
+        onMapLoaded?.(map);
+        setLoadedMap(mapId);
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => { cancelled = true; };
+  }, [mapId, onMapLoaded]);
+
+  // Alokasi berubah: bangun ulang distrik.
+  useEffect(() => { if (ready) sceneRef.current?.setDistricts(districts); }, [districts, ready]);
+  useEffect(() => { sceneRef.current?.setSelected(selectedId); }, [selectedId, ready]);
+  useEffect(() => { if (resetSignal > 0) sceneRef.current?.resetCamera(true); }, [resetSignal]);
+  useEffect(() => { if (style) sceneRef.current?.setStyle(style); }, [style, ready]);
+  useEffect(() => { if (cityName) sceneRef.current?.setCityLabel(cityName); }, [cityName, ready]);
+
+  return (
+    <div className="absolute inset-0">
+      <canvas ref={canvasRef} className="block h-full w-full touch-none cursor-grab active:cursor-grabbing" aria-label="3D city" />
+      {/* Label distrik: posisinya ditulis langsung ke DOM tiap frame, tanpa render ulang React. */}
+      {/* Pin kejadian (truk bermuatan, acara, usulan): dibuat langsung di DOM, posisinya ditulis tiap frame. */}
+      <div ref={floatersRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {districts.filter((d) => d.weight > 0).map((d) => (
+          <div
+            key={d.id}
+            ref={(el) => { if (el) labelRefs.current.set(d.id, el); else labelRefs.current.delete(d.id); }}
+            className="absolute left-0 top-0 transition-opacity duration-200"
+            style={{ opacity: 0 }}
+          >
+            <div
+              className="flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-slate-700 shadow-[0_4px_16px_-6px_rgba(40,60,140,0.35)] backdrop-blur-md"
+              style={{ outline: hovered === d.id || selectedId === d.id ? `2px solid ${DISTRICT_COLORS[d.kind]}` : "none" }}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ background: DISTRICT_COLORS[d.kind] }} />
+              {d.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!ready && !error && (
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">Building the city…</div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-slate-600">
+          The 3D view could not start ({error}). The rest of the app still works.
+        </div>
+      )}
+    </div>
+  );
+}

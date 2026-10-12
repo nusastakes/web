@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
+/* Gaya terang dan lembut: lavender pucat, satu aksen biru, kartu kaca. Acuan visual: WareTrack (Dilum Sanjaya). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #eef1fb;
+  --ink: #1b2340;
+  --ink-soft: #5b6486;
+  --accent: #3f6bff;
+  --accent-soft: #e4eaff;
+  --good: #1ea672;
+  --warn: #d98a06;
+  --bad: #d64545;
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.85);
+  --shadow: 0 10px 30px -12px rgba(40, 60, 140, 0.28), 0 2px 6px -2px rgba(40, 60, 140, 0.12);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html, body { height: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.glass-solid {
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border-radius: 0.75rem; padding: 0.6rem 1rem; font-size: 0.875rem; font-weight: 600;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+  cursor: pointer; user-select: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 8px 20px -8px rgba(63, 107, 255, 0.7); }
+.btn-primary:hover:not(:disabled) { background: #3459e6; }
+.btn-ghost { background: rgba(255,255,255,0.7); color: var(--ink); border: 1px solid rgba(27,35,64,0.1); }
+.btn-ghost:hover:not(:disabled) { background: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
 }
