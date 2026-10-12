@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# nusastakes/web
 
-## Getting Started
+Antarmuka web **Nusastakes**: game kota di Monad. Setiap kota adalah vault ERC-4626 yang dikelola walikota; penduduk
+menitipkan stablecoin dengan passkey, tanpa seed phrase dan tanpa token gas.
 
-First, run the development server:
+> **Status: kerangka.** Baru halaman bawaan `create-next-app` dan data peta contoh. Fitur (akun Mera, kota 3D, titip
+> dan tarik) dikerjakan di fase 2 dan 3. Repo ini dipublikasikan lebih awal supaya riwayat commit hackathon terlihat.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Cara menjalankan
+
+Syarat: Node.js (diuji dengan v26.11.1) dan npm.
+
+```
+npm install
+npm run dev      # http://localhost:3000
+npm run build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Repo ini tidak membawa `package-lock.json`; lockfile khusus dibuat saat publikasi untuk deploy. Rahasia tidak pernah
+ditaruh di repo; gunakan `.env` lokal.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Data peta
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`public/maps/` berisi cuplikan bangunan dan jalan dari Overture Maps (rilis `2026-09-23.1`) untuk SCBD Jakarta dan
+Malioboro Jogja, diambil sekali dan disimpan sebagai GeoJSON; frontend tidak memanggil Overture saat runtime.
 
-## Learn More
+Atribusi wajib: **© OpenStreetMap contributors, Overture Maps Foundation**. Sebagian bangunan berasal dari Google
+Open Buildings (CC BY 4.0) dan Microsoft ML Buildings (ODbL).
 
-To learn more about Next.js, take a look at the following resources:
+## Repo lain di organisasi
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [nusastakes/contracts](https://github.com/nusastakes/contracts): kontrak Solidity
+- [nusastakes/relayer](https://github.com/nusastakes/relayer): relayer gas dan keeper APY
+- [nusastakes/cre-guardian](https://github.com/nusastakes/cre-guardian): workflow Chainlink CRE "City Guardian"
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Penggunaan alat AI
 
-## Deploy on Vercel
+Dibuat dengan Claude Code (Claude Opus untuk rencana dan pemeriksaan, Claude Sonnet untuk pengerjaan). Keluaran AI
+diperiksa pengembang; yang belum diuji ditulis "belum diuji".
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Komponen yang sudah ada sebelumnya
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16.4.0, React 19.3.0, Tailwind CSS 4, TypeScript: kerangka bawaan `create-next-app`.
+- Data Overture Maps / OpenStreetMap (lihat atribusi di atas).
+- Rencana: `@category-labs/mera` (akun passkey), three.js (kota 3D), viem.
+
+## Lisensi
+
+MIT. Lihat `LICENSE`.
