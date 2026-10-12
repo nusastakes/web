@@ -22,6 +22,8 @@ interface Props {
   style?: CityStyle;
   styleCode?: string;
   onStyle?: (s: CityStyle) => void;
+  styleSync?: "local" | "loading" | "shared" | "saving" | "error";
+  styleError?: string;
 }
 
 const DEPUTY_TTL = 24 * 3600;
@@ -30,7 +32,7 @@ const DEPUTY_SHIFT_BPS = 2500;
 const LOW_GAS = 200_000_000_000_000_000n;
 const ausd = (raw: bigint) => fmtAusd(Number(raw) / 1e6);
 
-export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STYLE, styleCode = "", onStyle }: Props) {
+export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STYLE, styleCode = "", onStyle, styleSync = "local", styleError }: Props) {
   const w = useWallet();
   const ready = w.status === "ready" && !!w.address;
   const isMayor = ready && !!city.mayor && city.mayor.toLowerCase() === w.address!.toLowerCase();
@@ -189,7 +191,10 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                   );
                 })}
               </ul>
-              {styleCode && <p className="text-[11px] text-ink-soft">Share this look: add <code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code> to the link. It is saved in this browser for now.</p>}
+              <p className="text-[11px] text-ink-soft">
+                {styleSync === "shared" ? "Saved for everyone: residents see this look when they open the city." : styleSync === "saving" ? "Saving for everyone…" : styleSync === "error" ? `Saved in this browser only (${styleError ?? "relayer error"}).` : "Saved in this browser."}
+                {styleCode && <> Preview link: <code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code></>}
+              </p>
             </section>
             {error && <Notice tone="error">{error}</Notice>}
           </div>

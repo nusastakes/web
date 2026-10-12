@@ -106,6 +106,7 @@ export class CityFabric {
   /** Warna dasar bahan tanpa cahaya (jalan, trotoar, taman), untuk diredupkan saat malam. */
   private baseColors = new Map<THREE.MeshBasicMaterial, THREE.Color>();
   private night = 0;
+  private wet = 0;
   private treeSet: RevealSet | null = null;
   private lampReveal: RevealSet | null = null;
   private palmSet: RevealSet | null = null;
@@ -479,10 +480,12 @@ export class CityFabric {
   }
 
   /** 0 siang, 1 malam: lampu jalan menyala dan menerangi jalan. */
-  setNight(n: number) {
-    if (Math.abs(n - this.night) > 0.01) {
+  setNight(n: number, wet = 0) {
+    if (Math.abs(n - this.night) > 0.01 || Math.abs(wet - this.wet) > 0.01) {
       this.night = n;
-      const k = 1 - 0.62 * n;
+      this.wet = wet;
+      // Jalan basah sedikit lebih gelap dan kebiruan.
+      const k = (1 - 0.62 * n) * (1 - 0.18 * wet);
       const tint = new THREE.Color(0.78, 0.82, 1.0);
       const all = [...this.tierMats.flat(), ...this.parkMats];
       for (const m of all) {

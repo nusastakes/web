@@ -5,6 +5,7 @@ import { CityScene, type LabelPosition } from "@/lib/scene/CityScene";
 import type { CityMap } from "@/lib/scene/geometry";
 import type { CityStats, Floater, Inspect, LifeEvent, Tone } from "@/lib/scene/life";
 import type { CityStyle } from "@/lib/scene/themes";
+import type { InteriorInfo } from "@/lib/scene/interior";
 import type { District } from "@/lib/types";
 import { DISTRICT_COLORS } from "@/lib/palette";
 
@@ -17,6 +18,9 @@ export interface SceneApi {
   setHour: (h: number) => void;
   setClockPaused: (p: boolean) => void;
   clearInspect: () => void;
+  closeBuilding: () => void;
+  focusFloor: (level: number) => void;
+  setWeather: (mode: "auto" | "clear" | "rain") => void;
 }
 
 export interface CityTick { time: string; phase: string; hour: number; stats: CityStats }
@@ -38,6 +42,8 @@ interface Props {
   onInspect?: (info: Inspect | null) => void;
   /** Nama kota untuk layar LED di menara. */
   cityName?: string;
+  /** Gedung yang dibelah dan isinya (null saat ditutup). */
+  onBuilding?: (info: InteriorInfo | null) => void;
 }
 
 const mapCache = new Map<string, CityMap>();
@@ -53,7 +59,7 @@ async function loadMap(id: string): Promise<CityMap> {
 }
 
 /** Kota 3D. Adegan three.js hidup di dalam komponen ini; React hanya mengirim peta, distrik, dan pilihan. */
-export default function CityCanvas({ mapId, districts, selectedId, onSelect, onMapLoaded, resetSignal = 0, onScene, style, onTick, onInspect, cityName }: Props) {
+export default function CityCanvas({ mapId, districts, selectedId, onSelect, onMapLoaded, resetSignal = 0, onScene, style, onTick, onInspect, cityName, onBuilding }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const labelRefs = useRef(new Map<string, HTMLDivElement>());
@@ -62,6 +68,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   const onSceneRef = useRef(onScene);
   const onTickRef = useRef(onTick);
   const onInspectRef = useRef(onInspect);
+  const onBuildingRef = useRef(onBuilding);
   const [error, setError] = useState<string | null>(null);
   const [loadedMap, setLoadedMap] = useState<string | null>(null);
   const ready = loadedMap === mapId;
@@ -72,6 +79,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   useEffect(() => { onSceneRef.current = onScene; }, [onScene]);
   useEffect(() => { onTickRef.current = onTick; }, [onTick]);
   useEffect(() => { onInspectRef.current = onInspect; }, [onInspect]);
+  useEffect(() => { onBuildingRef.current = onBuilding; }, [onBuilding]);
   useEffect(() => { districtsRef.current = districts; }, [districts]);
 
   // Buat adegan sekali.
@@ -85,6 +93,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
         onSelect: (id) => onSelectRef.current(id),
         onTick: (t) => onTickRef.current?.(t),
         onInspect: (info) => onInspectRef.current?.(info),
+        onBuilding: (info) => onBuildingRef.current?.(info),
         onLabels: (labels: LabelPosition[]) => {
           for (const l of labels) {
             const el = labelRefs.current.get(l.id);
@@ -125,7 +134,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
     const chips = chipsRef.current;
     onSceneRef.current?.({
       emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), focusDistrict: (id) => scene.focusDistrict(id),
-      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(),
+      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m),
     });
     const shift = () => scene.setViewShift(window.innerWidth >= 768 ? 170 : 0);
     shift();

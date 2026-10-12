@@ -35,6 +35,10 @@ export const relayerHealth = () => call<Health>("/health");
 export const requestAusd = (address: Hex) => call<TxResult>("/faucet", { address });
 export const requestGas = (address: Hex) => call<{ hash: Hex; amountWei: string }>("/gas-drip", { address });
 
+/** Gaya kota yang disimpan relayer (hanya tampilan). */
+export const getCityStyle = (vault: Hex) => call<{ code: string; nonce: string }>(`/style/${vault}`);
+export const postCityStyle = (p: { vault: Hex; code: string; nonce: string; signature: Hex }) => call<{ vault: Hex; code: string; nonce: string }>("/style", p);
+
 export interface PermitSig { v: number; r: Hex; s: Hex }
 
 export const relayDeposit = (p: { vault: Hex; owner: Hex; assets: bigint; deadline: bigint } & PermitSig) =>

@@ -271,6 +271,8 @@ interface Agent {
   /** Gerak bebas lurus ke satu titik (taman, kerumunan diam), bukan lewat graf jalan. */
   free?: { tx: number; tz: number };
   riders?: number;
+  /** Selama mengembalikan false, agen menunggu di tempat (mis. menunggu lampu pejalan kaki). */
+  gate?: () => boolean;
   /** Waktu simulasi saat agen ini dihapus paling lambat (perjalanan yang terlalu lama). */
   ttl?: number;
 }
@@ -364,6 +366,10 @@ export class CityLife {
   private lastHour = 0;
   private leaders = new Map<number, Agent[]>();
   private motorRows = false;
+  /** Zebra cross di persimpangan berlampu: dua ujung dan arah kendaraan yang harus merah agar orang menyeberang. */
+  private crossings: { ax: number; az: number; bx: number; bz: number; from: number; to: number; sig: { axis: number; off: number } }[] = [];
+  private rain = 0;
+  private umbrellas: THREE.InstancedMesh;
 
   constructor(private parent: THREE.Object3D, private map: CityMap, graph: RoadGraph) {
     this.g = graph;
@@ -427,6 +433,22 @@ export class CityLife {
       for (const pl of this.places) this.byKind[pl.kind].push(pl);
       this.buildSignals();
       this.buildBusLine();
+    }
+    // Payung (tampil saat hujan) di atas kepala pejalan kaki.
+    const umb = merge([part(new THREE.ConeGeometry(1.0, 0.45, 8), 0xffffff, 0, 2.55, 0), part(box(0.05, 0.9, 0.05), 0x39456f, 0, 2.1, 0)]);
+    this.umbrellas = new THREE.InstancedMesh(umb, new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() }), 260);
+    this.umbrellas.count = 0;
+    this.umbrellas.frustumCulled = false;
+    this.umbrellas.setColorAt(0, WHITE);
+    this.group.add(this.umbrellas);
+    if (this.ok) for (const [n, sig] of this.signals) {
+      for (const e of this.g.adj[n]) {
+        if (e.foot || e.w < 5 || e.len < 18) continue;
+        const dx = (this.g.x[e.to] - this.g.x[n]) / e.len, dz = (this.g.z[e.to] - this.g.z[n]) / e.len;
+        const q = e.w / 2 + 2.4, half = e.w / 2 + 1.6;
+        const cx = this.g.x[n] + dx * q, cz = this.g.z[n] + dz * q;
+        this.crossings.push({ ax: cx + dz * half, az: cz - dx * half, bx: cx - dz * half, bz: cz + dx * half, from: e.to, to: n, sig });
+      }
     }
     const lightGeo = new THREE.BoxGeometry(0.5, 0.35, 1.5);
     this.heads = new THREE.InstancedMesh(lightGeo, new THREE.MeshBasicMaterial({ color: 0xfff1c4 }), 400);
@@ -799,8 +821,12 @@ export class CityLife {
   }
   /** 0 siang, 1 malam: menyalakan lampu kendaraan dan lampu pasar malam. */
   setNight(n: number) { this.night = n; }
+  /** 0 cerah, 1 hujan deras: payung, lebih sedikit pejalan kaki, lebih banyak ojek dan mobil. */
+  setRain(r: number) { this.rain = r; }
 
   private hour() { return this.clock?.hour ?? 12; }
+  /** Tempat (nama dan jenis) untuk sebuah gedung di peta. */
+  placeOf(building: number): Place | undefined { return this.places.find((q) => q.building === building); }
   /** Tempat sejenis dalam jarak `maxD` dari (x, z); bila tidak ada, sembarang tempat sejenis. */
   private pickNear(kind: keyof CityLife["byKind"], x: number, z: number, maxD: number): Place | undefined {
     const list = this.byKind[kind].filter((q) => Math.hypot(q.x - x, q.z - z) < maxD);
@@ -1270,6 +1296,56 @@ export class CityLife {
     a.onEnd = (ag) => { if (--stops <= 0 || m.open < 0.3) { ag.kill = true; return; } ag.wait = 2 + this.rnd() * 4; this.today.sales++; go(); };
   }
 
+  /** Orang menunggu di tepi zebra cross lalu menyeberang saat lampu kendaraan di jalur itu merah. */
+  private spawnCrosser() {
+    const c = this.crossings[Math.floor(this.rnd() * this.crossings.length)];
+    if (!c) return;
+    const flip = this.rnd() < 0.5;
+    const [sx, sz, ex, ez] = flip ? [c.bx, c.bz, c.ax, c.az] : [c.ax, c.az, c.bx, c.bz];
+    const a = this.spawn("ped", [this.nearestPed(sx, sz)], { speed: 1.4 + this.rnd() * 0.5 });
+    if (!a) return;
+    const j = (this.rnd() - 0.5) * 1.6;
+    a.x = sx + (ex - sx) * -0.05 + j * 0.3; a.z = sz + (ez - sz) * -0.05 + j * 0.3;
+    a.free = { tx: a.x, tz: a.z };
+    a.yaw = Math.atan2(-(ez - sz), ex - sx);
+    a.role = "Pedestrian · crossing the street";
+    a.info = () => (this.signalState(c.sig, c.from, c.to) === "r" ? "Crossing at the zebra crossing" : "Waiting for the cars to stop");
+    a.ttl = this.t + 80;
+    a.onEnd = (ag) => {
+      ag.gate = () => this.signalState(c.sig, c.from, c.to) === "r" && this.signalState(c.sig, c.to, c.from) !== "g";
+      ag.free = { tx: ex + j * 0.3, tz: ez + j * 0.3 };
+      ag.onEnd = (q) => {
+        q.gate = undefined;
+        // Setelah menyeberang, berjalan beberapa meter menjauh lalu masuk ke keramaian.
+        const ux = ex - sx, uz = ez - sz, l = Math.hypot(ux, uz) || 1;
+        q.free = { tx: ex + (ux / l) * 4, tz: ez + (uz / l) * 4 };
+        q.onEnd = (z) => { z.kill = true; this.today.trips++; };
+      };
+    };
+  }
+
+  /** Payung di atas pejalan kaki saat hujan. */
+  private updateUmbrellas() {
+    if (this.rain < 0.15) { this.umbrellas.count = 0; return; }
+    let i = 0;
+    const col = new THREE.Color();
+    for (const a of this.agents) {
+      if (a.kind !== "ped" || a.kill || i >= 260) continue;
+      if ((a.id * 7) % 10 >= 8) continue;
+      this.dummy.position.set(a.x, 0, a.z);
+      this.dummy.rotation.set(0, a.yaw, 0);
+      this.dummy.scale.setScalar(KIND_SCALE.ped);
+      this.dummy.updateMatrix();
+      this.umbrellas.setMatrixAt(i, this.dummy.matrix);
+      col.setHex([0x2f6fe0, 0xe8553d, 0xf6c445, 0x252a45, 0x10b3a3, 0xec4899, 0x7a5cff][a.id % 7]);
+      this.umbrellas.setColorAt(i, col);
+      i++;
+    }
+    this.umbrellas.count = i;
+    this.umbrellas.instanceMatrix.needsUpdate = true;
+    if (this.umbrellas.instanceColor) this.umbrellas.instanceColor.needsUpdate = true;
+  }
+
   // --- Penentu jumlah per peran -------------------------------------------------------------------------------
 
   private routines() {
@@ -1288,8 +1364,10 @@ export class CityLife {
     const C = ck ?? null;
     const traffic = C ? C.traffic(h) : 0.6, commute = C ? C.commute(h) : 0.4, delivery = C ? C.delivery(h) : 0.4;
     want(n("Commuter"), cars * 0.55 * commute * k, () => this.spawnCommuter(this.rnd() < 0.6 ? "car" : "bike"));
-    want(n("Ojek online · passenger"), (3 + 7 * commute) * k, () => this.spawnCommuter("ojekP"));
-    want(n("Ojek online · food"), 12 * delivery * k, () => this.spawnFoodDelivery());
+    const wet = this.rain;
+    want(n("Ojek online · passenger"), (3 + 7 * commute) * k * (1 + wet), () => this.spawnCommuter("ojekP"));
+    want(n("Ojek online · food"), 12 * delivery * k * (1 + 0.8 * wet), () => this.spawnFoodDelivery());
+    if (this.crossings.length) want(n("Pedestrian · crossing"), Math.min(16, this.crossings.length * 0.6) * k * (C ? C.walkers(h) : 0.6) * (1 - 0.5 * wet), () => this.spawnCrosser());
     if (!C || C.busService(h)) {
       want(n("City bus"), this.bus ? Math.max(2, Math.round(this.bus.path.length / 18)) * (grow > 0.12 ? 1 : 0) : 0, () => this.spawnBus());
       want(n("Angkot"), Math.min(10, this.g.streetLength / 1600) * k, () => this.spawnAngkot());
@@ -1297,10 +1375,10 @@ export class CityLife {
     if (!C || C.restock(h)) want(n("Delivery van"), 4 * k, () => this.spawnRestock());
     if (C && C.garbage(h)) want(n("Garbage truck"), grow > 0.2 ? 1 : 0, () => this.spawnGarbage());
     if ((!C || C.construction(h)) && this.sites.length) want(n("Concrete mixer"), Math.min(3, this.sites.length), () => this.spawnMixer());
-    if (!C || C.vendors(h)) want(n("Street vendor"), 9 * k, () => this.spawnVendor());
+    if (!C || C.vendors(h)) want(n("Street vendor"), 9 * k * (1 - 0.6 * wet), () => this.spawnVendor());
     // Pejalan kaki dengan tujuan sesuai jam: kantor pagi, makan siang, belanja sore, pulang malam.
     const walkers = C ? C.walkers(h) : 0.6;
-    if (n("Pedestrian") < Math.round(70 * walkers * k)) {
+    if (n("Pedestrian") < Math.round(70 * walkers * k * (1 - 0.55 * wet))) {
       const r = this.rnd();
       const [fromK, toK, label] = h < 10 ? (r < 0.75 ? ["home", "office", "Office worker"] : ["home", "civic", "Student"])
         : h < 14 ? (r < 0.7 ? ["office", "food", "Lunch break"] : ["home", "shop", "Shopper"])
@@ -1312,8 +1390,8 @@ export class CityLife {
     }
     if (this.parks.length) {
       const park = C ? C.parkLife(h) : 0.3;
-      want(n("Jogger"), 10 * park * k, () => this.parkWalker("jogger"));
-      want(n("Park visitor"), (4 + 8 * park) * k, () => this.parkWalker("stroller"));
+      want(n("Jogger"), 10 * park * k * (1 - wet), () => this.parkWalker("jogger"));
+      want(n("Park visitor"), (4 + 8 * park) * k * (1 - 0.85 * wet), () => this.parkWalker("stroller"));
     }
     // Orang menunggu di halte.
     if (this.bus && (!C || C.busService(h))) {
@@ -1468,6 +1546,7 @@ export class CityLife {
 
   private step(a: Agent, dt: number) {
     if (a.wait > 0) { a.wait -= dt; if (a.wait > 0) return; }
+    if (a.gate && !a.gate()) return;
     if (a.free) {
       const dx = a.free.tx - a.x, dz = a.free.tz - a.z, d = Math.hypot(dx, dz), mv = a.speed * dt;
       if (d <= mv || a.speed === 0) { a.x = a.free.tx; a.z = a.free.tz; if (a.speed > 0 || a.wait <= 0) this.arrived(a); }
@@ -1729,6 +1808,7 @@ export class CityLife {
       this.place(a, dt);
     }
     this.updateVehicleLights();
+    this.updateUmbrellas();
     for (const k of Object.keys(this.pools) as Kind[]) this.pools[k].flush();
     this.piles.flush();
     this.beacons.instanceMatrix.needsUpdate = true;

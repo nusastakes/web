@@ -17,11 +17,18 @@ export class CityClock {
   /** Detik nyata per satu jam kota. */
   secondsPerHour = 16;
   paused = false;
+  /** Hari ke berapa sejak halaman dibuka. */
+  day = 0;
+  /** Cuaca: otomatis (hujan sore sesekali, seperti musim hujan di Indonesia), selalu cerah, atau hujan. */
+  weather: "auto" | "clear" | "rain" = "auto";
 
   constructor(startHour = 6.6) { this.hour = startHour; }
 
   update(dt: number) {
-    if (!this.paused) this.hour = wrap(this.hour + dt / this.secondsPerHour);
+    if (this.paused) return;
+    const next = this.hour + dt / this.secondsPerHour;
+    if (next >= 24) this.day++;
+    this.hour = wrap(next);
   }
 
   get label(): string {
@@ -78,6 +85,17 @@ export class CityClock {
   garbage(h = this.hour) { return inRange(h, 3.8, 6.2); }
   /** Proyek konstruksi bekerja siang hari. */
   construction(h = this.hour) { return inRange(h, 7.5, 17.5); }
+  /** Target hujan 0..1. Hari hujan (sekitar 4 dari 10) turun sore 14.30 sampai 17.30, kadang berlanjut gerimis malam. */
+  rainTarget(h = this.hour): number {
+    if (this.weather === "clear") return 0;
+    if (this.weather === "rain") return 1;
+    const r = Math.sin((this.day + 1) * 12.9898) * 43758.5453;
+    const wet = r - Math.floor(r) < 0.42;
+    if (!wet) return 0;
+    if (h >= 14.5 && h < 17.5) return 1;
+    if (h >= 17.5 && h < 20) return 0.35;
+    return 0;
+  }
   /** Toko buka. */
   shopsOpen(h = this.hour) { return inRange(h, 8, 21.5); }
 }

@@ -20,7 +20,7 @@ const strip = (file) => {
     .join("\n");
 };
 
-const code = ["src/lib/palette.ts", "src/lib/scene/geometry.ts", "src/lib/scene/roadgraph.ts", "src/lib/scene/props.ts", "src/lib/scene/themes.ts", "src/lib/scene/places.ts", "src/lib/scene/clock.ts", "src/lib/scene/scenery.ts", "src/lib/scene/assign.ts", "src/lib/scene/fabric.ts", "src/lib/scene/construction.ts", "src/lib/scene/textures.ts", "src/lib/scene/landmarks.ts", "src/lib/scene/life.ts", "src/lib/scene/civic.ts", "src/lib/scene/CityScene.ts"].map(strip).join("\n");
+const code = ["src/lib/palette.ts", "src/lib/scene/geometry.ts", "src/lib/scene/roadgraph.ts", "src/lib/scene/props.ts", "src/lib/scene/themes.ts", "src/lib/scene/places.ts", "src/lib/scene/clock.ts", "src/lib/scene/scenery.ts", "src/lib/scene/assign.ts", "src/lib/scene/fabric.ts", "src/lib/scene/construction.ts", "src/lib/scene/textures.ts", "src/lib/scene/landmarks.ts", "src/lib/scene/interior.ts", "src/lib/scene/life.ts", "src/lib/scene/civic.ts", "src/lib/scene/CityScene.ts"].map(strip).join("\n");
 const maps = {
   "SCBD, Jakarta": JSON.parse(readFileSync(join(root, "public/maps/scbd-jakarta.city.json"), "utf8")),
   "Malioboro, Yogyakarta": JSON.parse(readFileSync(join(root, "public/maps/malioboro-jogja.city.json"), "utf8")),
@@ -69,6 +69,7 @@ const html = `<!doctype html>
   #clockbar .t { font: 600 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; } #clockbar .ph { font-size:11px; color:var(--soft); margin-top:3px; }
   #clockbar button { width:auto; padding:5px 9px; font-size:11px; } #clockbar button.on { background:var(--accent); color:#fff; }
   #econ { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; } #econ div { background:rgba(255,255,255,.85); border-radius:10px; padding:6px 8px; font-size:10.5px; color:var(--soft); } #econ b { display:block; font-size:15px; color:var(--ink); }
+  #bcard { position:fixed; left:372px; bottom:52px; width:320px; display:none; padding:12px 14px; font-size:12px; max-height:46vh; overflow:auto; } #bcard h3 { margin:0; font-size:14px; } #bcard .sub { color:var(--soft); font-size:11px; } #bcard li { margin:6px 0; list-style:none; } #bcard ul { padding:0; margin:8px 0 0; } #bcard .ag { border-top:1px solid rgba(15,22,51,.08); margin-top:8px; padding-top:6px; }
   #inspect { position:fixed; left:50%; bottom:52px; transform:translateX(-50%); display:none; max-width:360px; padding:10px 14px; font-size:12px; } #inspect b { display:block; font-size:13px; }
   #hint { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); font-size:11px; color:var(--soft); background:rgba(255,255,255,.7); padding:6px 12px; border-radius:99px; backdrop-filter:blur(8px); white-space:nowrap; }
   @media (max-width:760px){ #panel{ display:none; } #left{ top:auto; max-height:52vh; } #title{ display:none; } #hint{ display:none; } }
@@ -118,9 +119,11 @@ const html = `<!doctype html>
 </div>
 <div class="card" id="clockbar"><div><div class="t" id="ctime">06:36</div><div class="ph" id="cphase">Dawn</div></div>
   <div style="display:flex;gap:4px"><button data-sp="0">❚❚</button><button data-sp="16" class="on">1×</button><button data-sp="4">4×</button><button data-sp="1">16×</button></div>
-  <div style="display:flex;gap:4px"><button data-h="7.2">Morning rush</button><button data-h="12.2">Lunch</button><button data-h="18.3">Evening</button><button data-h="21.5">Night</button></div></div>
+  <div style="display:flex;gap:4px"><button data-h="7.2">Morning rush</button><button data-h="12.2">Lunch</button><button data-h="18.3">Evening</button><button data-h="21.5">Night</button></div>
+  <div style="display:flex;gap:4px"><button data-w="auto" class="on">Auto weather</button><button data-w="clear">Clear</button><button data-w="rain">Rain</button></div></div>
+<div class="card" id="bcard"></div>
 <div class="card" id="inspect"><b id="ititle"></b><span id="idetail"></span></div>
-<div id="hint">Drag to rotate · scroll to zoom · click a car, bus, cart or person to see what they are doing · sample data, no real money</div>
+<div id="hint">Drag to rotate · scroll to zoom · click a building to look inside, or a car, bus, cart or person to see what they are doing · sample data</div>
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -163,6 +166,14 @@ const scene = new CityScene(canvas, {
     $("ctime").textContent = tk.time; $("cphase").textContent = tk.phase;
     const s = tk.stats;
     $("econ").innerHTML = [["vehicles", s.vehicles], ["people", s.people], ["buses", s.buses + " · " + s.riders + " riding"], ["trips", s.tripsToday], ["deliveries", s.deliveriesToday], ["bus riders", s.busRidersToday], ["street vendors", s.vendors], ["night stalls", s.stallsOpen], ["sales", s.salesToday]].map(([k, v]) => "<div><b>" + v + "</b>" + k + "</div>").join("");
+  },
+  onBuilding: (info) => {
+    const el = $("bcard");
+    if (!info) { el.style.display = "none"; return; }
+    el.style.display = "block";
+    el.innerHTML = "<div style='display:flex;justify-content:space-between;gap:8px'><div><h3>" + info.title + "</h3><div class='sub'>" + info.subtitle + " · " + info.occupants + " people inside</div></div><button id='bclose' style='width:auto;padding:2px 8px'>×</button></div><ul>" + info.floors.map((f) => "<li data-fl='" + f.level + "' style='cursor:pointer'><b>Fl " + f.level + " · " + f.label + "</b><br><span class='sub'>" + f.doing + "</span></li>").join("") + "</ul>" + (info.agenda.length ? "<div class='ag'><div class='sub'><b>CITY AGENDA</b></div>" + info.agenda.map((a) => "<div>" + a + "</div>").join("") + "</div>" : "");
+    $("bclose").onclick = () => scene.closeBuilding();
+    el.querySelectorAll("li[data-fl]").forEach((li) => (li.onclick = () => scene.focusFloor(Number(li.dataset.fl))));
   },
   onInspect: (info) => {
     const el = $("inspect");
@@ -270,6 +281,7 @@ document.querySelectorAll("#clockbar button[data-sp]").forEach((b) => b.addEvent
 }));
 document.querySelectorAll("#clockbar button[data-h]").forEach((b) => b.addEventListener("click", () => { scene.setHour(Number(b.dataset.h)); log("Jump to " + b.textContent.toLowerCase()); }));
 $("inspect").addEventListener("click", () => { scene.clearInspect(); $("inspect").style.display = "none"; });
+document.querySelectorAll("#clockbar button[data-w]").forEach((b) => b.addEventListener("click", () => { scene.setWeather(b.dataset.w); document.querySelectorAll("#clockbar button[data-w]").forEach((x) => x.classList.toggle("on", x === b)); log("Weather: " + b.textContent.toLowerCase()); }));
 
 // Mode otomatis: kota hidup sendiri
 const script = ["t1", "dep", "fest", "t2", "fee", "prop", "appr", "wd", "sat", "t1"];

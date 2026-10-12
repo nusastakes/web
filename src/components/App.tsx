@@ -17,7 +17,8 @@ import ManageSheet from "./sheets/ManageSheet";
 import WithdrawSheet from "./sheets/WithdrawSheet";
 
 import type { CityTick, SceneApi } from "./CityCanvas";
-import { InspectCard, LifeClock } from "./LifeHud";
+import { BuildingCard, InspectCard, LifeClock } from "./LifeHud";
+import type { InteriorInfo } from "@/lib/scene/interior";
 import type { Inspect } from "@/lib/scene/life";
 
 const CityCanvas = dynamic(() => import("./CityCanvas"), { ssr: false });
@@ -43,6 +44,7 @@ function Shell() {
   const [tick, setTick] = useState<CityTick | null>(null);
   const [inspect, setInspect] = useState<Inspect | null>(null);
   const [speed, setSpeed] = useState(16);
+  const [building, setBuilding] = useState<InteriorInfo | null>(null);
   useCityActivity(current.vault, useCallback((e) => sceneApi.current?.emit(e), []));
   const tvl = current.totalAssets;
   useEffect(() => {
@@ -66,14 +68,14 @@ function Shell() {
     return () => { window.clearTimeout(first); window.clearInterval(id); };
   }, [current.preview, current.id]);
 
-  const { style, code: styleCode, save: saveStyle } = useCityStyle(current.vault ?? current.id);
+  const { style, code: styleCode, save: saveStyle, sync: styleSync, error: styleError } = useCityStyle(current.vault ?? current.id, current.preview ? undefined : current.vault, wallet);
 
   const pick = useCallback((id: string) => { setPickedId(id); setDistrictId(null); }, []);
   const open = (k: Exclude<SheetKind, null>) => { setSheet((s) => (s === k ? null : k)); setMobilePanel(false); };
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <CityCanvas mapId={current.mapId} districts={current.districts} selectedId={districtId} onSelect={setDistrictId} resetSignal={recenter} onScene={onScene} style={style} onTick={setTick} onInspect={setInspect} cityName={current.name} />
+      <CityCanvas mapId={current.mapId} districts={current.districts} selectedId={districtId} onSelect={setDistrictId} resetSignal={recenter} onScene={onScene} style={style} onTick={setTick} onInspect={setInspect} cityName={current.name} onBuilding={setBuilding} />
 
       <div className="pointer-events-none absolute inset-x-3 top-3 sm:inset-x-4 sm:top-4">
         <TopBar cities={cities} preview={PREVIEW_CITIES} current={current} onPick={pick} onAfterAccountChange={refresh} />
@@ -90,10 +92,11 @@ function Shell() {
           {mobilePanel && <div className="md:hidden"><CityPanel city={current} selectedId={districtId} onSelect={setDistrictId} me={wallet.address} /></div>}
           {!mobilePanel && sheet === "deposit" && <DepositSheet city={current} onClose={() => setSheet(null)} onDone={refresh} />}
           {!mobilePanel && sheet === "withdraw" && <WithdrawSheet city={current} onClose={() => setSheet(null)} onDone={refresh} />}
-          {!mobilePanel && sheet === "manage" && <ManageSheet city={current} onClose={() => setSheet(null)} onDone={refresh} style={style} styleCode={styleCode} onStyle={saveStyle} />}
+          {!mobilePanel && sheet === "manage" && <ManageSheet city={current} onClose={() => setSheet(null)} onDone={refresh} style={style} styleCode={styleCode} onStyle={(s) => void saveStyle(s)} styleSync={styleSync} styleError={styleError} />}
           {!mobilePanel && sheet === "found" && <FoundCitySheet onClose={() => setSheet(null)} onFounded={async (vault) => { await refresh(); if (vault) pick(vault); }} />}
         </div>
         <div><ActionDock mayor={isMayor} active={sheet} onOpen={open} onRecenter={() => setRecenter((n) => n + 1)} onDetails={() => { setMobilePanel((v) => !v); setSheet(null); }} /></div>
+        <div className="pointer-events-none fixed left-3 top-[10.5rem] sm:left-4"><BuildingCard info={building} onClose={() => api?.closeBuilding()} onFloor={(l) => api?.focusFloor(l)} /></div>
         <div className="pointer-events-none fixed bottom-24 left-1/2 -translate-x-1/2"><InspectCard info={inspect} onClose={() => { api?.clearInspect(); setInspect(null); }} /></div>
         <div className="hidden flex-col items-end gap-2 sm:flex">
           <LifeClock tick={tick} api={api} speed={speed} onSpeed={setSpeed} />

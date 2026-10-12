@@ -111,8 +111,8 @@ export class Scenery {
   }
 
   /** Langit mengikuti jam: siang memakai warna tema, senja jingga, malam biru tua berbintang. */
-  setTime(daylight: number, dusk: number) {
-    const key = `${daylight.toFixed(2)}:${dusk.toFixed(2)}`;
+  setTime(daylight: number, dusk: number, overcast = 0) {
+    const key = `${daylight.toFixed(2)}:${dusk.toFixed(2)}:${overcast.toFixed(2)}`;
     if (key === this.timeKey) return;
     this.timeKey = key;
     const mix = (a: string, b: string, k: number) => new THREE.Color(a).lerp(new THREE.Color(b), k);
@@ -121,9 +121,12 @@ export class Scenery {
     let bottom = mix(this.theme.sky[1], "#283068", night);
     top = top.lerp(new THREE.Color("#f39a7a"), dusk * 0.55);
     bottom = bottom.lerp(new THREE.Color("#ffc9a3"), dusk * 0.7);
+    // Mendung: langit abu kebiruan dan awan kelabu.
+    top = top.lerp(new THREE.Color("#7d8aa6").multiplyScalar(0.4 + 0.6 * daylight), overcast * 0.85);
+    bottom = bottom.lerp(new THREE.Color("#a7b1c6").multiplyScalar(0.4 + 0.6 * daylight), overcast * 0.85);
     this.paintSky(`#${top.getHexString()}`, `#${bottom.getHexString()}`);
     (this.stars.material as THREE.PointsMaterial).opacity = Math.max(0, night - 0.35) * 1.4;
-    this.cloudMat.color.setRGB(1 - night * 0.6, 1 - night * 0.58, 1 - night * 0.45).lerp(new THREE.Color("#ffd2b8"), dusk * 0.5);
+    this.cloudMat.color.setRGB(1 - night * 0.6, 1 - night * 0.58, 1 - night * 0.45).lerp(new THREE.Color("#ffd2b8"), dusk * 0.5).lerp(new THREE.Color("#8a93a8"), overcast * 0.7);
   }
 
   setTheme(theme: Theme) {

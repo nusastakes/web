@@ -57,7 +57,7 @@ export function distToPolygonEdge(px: number, pz: number, p: number[]): number {
 const ROOF_TILES: readonly (readonly number[])[] = [[0.78, 0.36, 0.26], [0.66, 0.3, 0.24], [0.5, 0.58, 0.74], [0.86, 0.52, 0.3], [0.7, 0.42, 0.36]];
 
 /** Menggeser tiap titik tapak ke arah pusatnya sejauh `d` meter (dibatasi 20% jaraknya). */
-function shrinkFootprint(p: number[], d: number): number[] {
+export function shrinkFootprint(p: number[], d: number): number[] {
   const n = p.length / 2;
   let cx = 0, cz = 0;
   for (let i = 0; i < n; i++) { cx += p[i * 2]; cz += p[i * 2 + 1]; }
@@ -84,6 +84,19 @@ function isConvex(p: number[]): boolean {
   return pos === 0 || neg === 0;
 }
 
+/** Tapak yang benar-benar digambar (sedikit ke dalam, lihat komentar di `buildBuildingsGeometry`). */
+export function footprintOf(b: MapBuilding, bi: number): number[] {
+  return shrinkFootprint(b.p, 0.08 + Math.min(0.6, b.h / 380) + 0.08 * hash01(bi * 1.31));
+}
+
+/** Gaya fasad: 0 menara kaca, 1 kantor beton, 2 hunian berwarna, 3 ruko. */
+export function styleOf(b: MapBuilding, bi: number, pitched?: boolean): number {
+  const h = b.h, n = b.p.length / 2;
+  const pt = pitched ?? (h <= 18 && b.a <= 700 && n <= 14 && hash01(bi * 9.1 + 2) < 0.78 && isConvex(b.p));
+  const sr = hash01(bi * 5.3 + 7);
+  return h >= 45 ? (sr < 0.72 ? 0 : 1) : h >= 20 ? (sr < 0.45 ? 1 : 2) : pt ? 2 : sr < 0.6 ? 3 : 2;
+}
+
 export interface BuildingMeshParts {
   geometry: THREE.BufferGeometry;
   /** Tinggi bangunan terjangkung, untuk menempatkan label. */
@@ -108,6 +121,7 @@ export function buildBuildingsGeometry(buildings: MapBuilding[], indices: number
   const owner: number[] = [];
   const bh: number[] = [];
   const bsty: number[] = [];
+  const bidA: number[] = [];
   const wsg: number[] = [];
   let curStyle = 0;
   let segStart = 0;
@@ -123,6 +137,7 @@ export function buildBuildingsGeometry(buildings: MapBuilding[], indices: number
     if (rgb) col.push(rgb[0], rgb[1], rgb[2]); else col.push(shade, shade, shade);
     bh.push(curH);
     bsty.push(curStyle);
+    bidA.push(cur);
     wsg.push(segLen > 0 ? u - segStart : 0, segLen);
     wuv.push(u, v);
     seed.push(sd);
@@ -170,7 +185,7 @@ export function buildBuildingsGeometry(buildings: MapBuilding[], indices: number
     // Dinding gedung yang berimpit (bagian gedung dari Overture) digeser sedikit ke dalam dengan jarak berbeda per gedung,
     // supaya tidak berebut kedalaman dan berkedip-kedip (z-fighting). Gedung yang lebih tinggi bergeser lebih jauh.
     const raw = buildings[bi];
-    const b = { ...raw, p: shrinkFootprint(raw.p, 0.08 + Math.min(0.6, raw.h / 380) + 0.08 * hash01(bi * 1.31)) };
+    const b = { ...raw, p: footprintOf(raw, bi) };
     const n = b.p.length / 2;
     if (n < 3) continue;
     const h = b.h * heightScale;
@@ -182,8 +197,7 @@ export function buildBuildingsGeometry(buildings: MapBuilding[], indices: number
     const tone = 0.94 + hash01(bi * 3.7 + 5) * 0.06;
     // Gaya fasad: 0 menara kaca, 1 kantor beton, 2 hunian berwarna, 3 ruko. Bangunan kecil cembung beratap miring.
     const pitched = h <= 18 && b.a <= 700 && n <= 14 && hash01(bi * 9.1 + 2) < 0.78 && isConvex(b.p);
-    const sr = hash01(bi * 5.3 + 7);
-    curStyle = h >= 45 ? (sr < 0.72 ? 0 : 1) : h >= 20 ? (sr < 0.45 ? 1 : 2) : pitched ? 2 : sr < 0.6 ? 3 : 2;
+    curStyle = styleOf(b, bi, pitched);
 
     // Arah lilitan (x-z): luas bertanda positif berarti berlawanan arah jarum jam.
     let area2 = 0;
@@ -304,6 +318,7 @@ export function buildBuildingsGeometry(buildings: MapBuilding[], indices: number
   g.setAttribute("bord", new THREE.Float32BufferAttribute(bord, 1));
   g.setAttribute("bh", new THREE.Float32BufferAttribute(bh, 1));
   g.setAttribute("bstyle", new THREE.Float32BufferAttribute(bsty, 1));
+  g.setAttribute("bid", new THREE.Float32BufferAttribute(bidA, 1));
   g.setAttribute("wseg", new THREE.Float32BufferAttribute(wsg, 2));
   g.computeBoundingSphere();
   g.computeBoundingBox();

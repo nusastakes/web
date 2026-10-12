@@ -9,7 +9,8 @@ import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
 import type { District } from "../types";
 import { DISTRICT_COLORS } from "../palette";
 import { assignDistricts, centroid } from "./assign";
-import { buildBuildingsGeometry, hash01, type CityMap } from "./geometry";
+import { buildBuildingsGeometry, footprintOf, hash01, styleOf, type CityMap } from "./geometry";
+import { BuildingInterior, type AgendaItem, type BuildingKind, type InteriorInfo } from "./interior";
 import { Construction, type CraneSite } from "./construction";
 import { CityFabric } from "./fabric";
 import { CityCivic } from "./civic";
@@ -53,6 +54,8 @@ export interface SceneCallbacks {
   onInspect?: (info: Inspect | null) => void;
   /** Jam kota dan ringkasan kegiatan, dua kali per detik. */
   onTick?: (t: { time: string; phase: string; hour: number; stats: CityStats }) => void;
+  /** Gedung yang dibuka (dibelah) dan isinya; null saat ditutup. */
+  onBuilding?: (info: InteriorInfo | null) => void;
 }
 
 interface DistrictMesh {
@@ -103,14 +106,27 @@ export class CityScene {
   private inspectClock = 0;
   private siteKey = "";
   private shopsOpen = 1;
+  /** Mode hemat untuk ponsel dan perangkat lemah: bayangan lebih kecil, piksel lebih sedikit, kota sedikit lebih sepi. */
+  private lowPower = false;
+  /** Hujan 0..1 dan butir hujan (garis jatuh di sekitar pusat pandangan). */
+  private rain = 0;
+  private rainLines: THREE.LineSegments | null = null;
+  private rainPos: Float32Array | null = null;
   private landmarks: Landmarks | null = null;
+  /** Gedung yang sedang dibelah dan isinya. */
+  private interior: BuildingInterior | null = null;
+  private interiorId = -1;
+  private buildingClock = 0;
+  private hallId = -1;
+  /** Kejadian kota terbaru (tindakan walikota, Satpam, Analis, penduduk) yang tampil di dalam gedung. */
+  private agenda: AgendaItem[] = [];
   private cityLabel = "Nusastakes city";
   private lastStats: CityStats | null = null;
   /** Pasca-proses (glow lampu malam, vignette, antialias) hanya di layar lebar; ponsel memakai render biasa. */
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
   /** Seragam bersama semua bahan bangunan: waktu dan warna langit untuk pantulan kaca. */
-  private shared = { uTime: { value: 0 }, uSkyTop: { value: new THREE.Color(0xcfe0ff) }, uSkyBot: { value: new THREE.Color(0xeef1fb) }, uPix: { value: 0.001 } };
+  private shared = { uTime: { value: 0 }, uSkyTop: { value: new THREE.Color(0xcfe0ff) }, uSkyBot: { value: new THREE.Color(0xeef1fb) }, uPix: { value: 0.001 }, uCutId: { value: -1 }, uCutC: { value: new THREE.Vector3() }, uCutN: { value: new THREE.Vector3(0, 0, 1) } };
   private focusAnim: { t: number; from: THREE.Vector3; to: THREE.Vector3; fromDist: number; toDist: number; fromDir: THREE.Vector3; toDir: THREE.Vector3 } | null = null;
   private map: CityMap | null = null;
   private districts: District[] = [];
@@ -130,8 +146,11 @@ export class CityScene {
 
   constructor(private canvas: HTMLCanvasElement, private cb: SceneCallbacks = {}) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.lowPower = window.innerWidth < 820 || (navigator.hardwareConcurrency ?? 8) <= 4;
+    if (this.lowPower) this.activity = 0.65;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.lowPower ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
+    this.renderer.localClippingEnabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setClearColor(BG, 1);
 
@@ -167,7 +186,7 @@ export class CityScene {
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff1d8, 2.4);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(this.lowPower ? 1024 : 2048, this.lowPower ? 1024 : 2048);
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 1.3;
     this.sun.shadow.radius = 4;
@@ -193,7 +212,7 @@ export class CityScene {
     const [x0, z0, x1, z1] = map.bounds;
     this.radius = Math.max(x1 - x0, z1 - z0) / 2 + 20;
     this.controls.target.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
-    this.controls.minDistance = this.radius * 0.5;
+    this.controls.minDistance = 28;
     this.controls.maxDistance = this.radius * 10;
     this.scene.fog = new THREE.Fog(BG, this.radius * 6, this.radius * 14);
     this.camera.far = this.radius * 24;
@@ -262,6 +281,10 @@ export class CityScene {
     this.scenery = null;
     this.civic = null;
     this.landmarks = null;
+    this.interior?.dispose();
+    this.interior = null;
+    this.interiorId = -1;
+    this.shared.uCutId.value = -1;
     this.civicKey = "";
     this.graph = null;
   }
@@ -322,7 +345,9 @@ export class CityScene {
       const order = new Map<number, number>();
       // Balai kota: tiga bangunan rendah terdekat dari pusat (bukan menara) berdiri sejak kota kosong.
       const starterList = d.kind === "idle" ? keyed.filter((k) => this.map!.buildings[k.bi].h <= 40).slice(0, 3) : [];
-      if (starterList[0]) this.hall = { x: starterList[0].bx, z: starterList[0].bz, h: this.map.buildings[starterList[0].bi].h };
+      // Balai kota: gedung menengah (14 sampai 32 m) terdekat dari pusat, supaya punya beberapa lantai untuk diisi.
+      const hallPick = d.kind === "idle" ? keyed.find((k) => this.map!.buildings[k.bi].h >= 14 && this.map!.buildings[k.bi].h <= 32) ?? starterList[0] : undefined;
+      if (hallPick) { this.hall = { x: hallPick.bx, z: hallPick.bz, h: this.map.buildings[hallPick.bi].h }; this.hallId = hallPick.bi; starterList.push(hallPick); }
       const starters = new Set(starterList.map((k) => k.bi));
       keyed.forEach((k, r) => {
         let o = (r / keyed.length) * 0.92 + 0.04 * hash01(k.bi * 2.9);
@@ -400,8 +425,8 @@ export class CityScene {
   }
 
   /** Menjalankan sebuah kejadian di kota: truk, kerumunan, konfeti, pin. */
-  emit(ev: LifeEvent) { this.life?.emit(ev); }
-  setActivity(v: number) { this.activity = v; this.life?.setActivity(v); }
+  emit(ev: LifeEvent) { this.remember(ev); this.life?.emit(ev); }
+  setActivity(v: number) { this.activity = v * (this.lowPower ? 0.65 : 1); this.life?.setActivity(this.activity); }
 
   /** Terbang kamera ke sebuah distrik. */
   focusDistrict(id: string, distanceFactor = 1.15) {
@@ -410,14 +435,14 @@ export class CityScene {
   }
 
   /** Kamera mendekat ke (x, z) dengan sudut lebih menghadap ke bawah supaya jalan terlihat di antara bangunan tinggi. */
-  focusOn(x: number, z: number, dist: number, polar = 0.62) {
+  focusOn(x: number, z: number, dist: number, polar = 0.62, y = 0) {
     const from = this.controls.target.clone();
     const fromDir = this.camera.position.clone().sub(from);
     const fromDist = fromDir.length();
     fromDir.normalize();
     const az = Math.atan2(fromDir.x, fromDir.z);
     const toDir = new THREE.Vector3(Math.sin(polar) * Math.sin(az), Math.cos(polar), Math.sin(polar) * Math.cos(az));
-    this.focusAnim = { t: 0, from, to: new THREE.Vector3(x, 0, z), fromDist, toDist: Math.max(this.controls.minDistance, dist), fromDir, toDir };
+    this.focusAnim = { t: 0, from, to: new THREE.Vector3(x, y, z), fromDist, toDist: Math.max(this.controls.minDistance, dist), fromDir, toDir };
     this.controls.autoRotate = false;
   }
 
@@ -444,6 +469,52 @@ export class CityScene {
 
   // --- Jam kota ---------------------------------------------------------------------------------------------
 
+  /** Cuaca: "auto" (hujan sore sesekali), "clear", atau "rain". */
+  setWeather(mode: "auto" | "clear" | "rain") { this.clock.weather = mode; }
+
+  private updateRain(dt: number) {
+    if (this.rain < 0.02) { if (this.rainLines) this.rainLines.visible = false; return; }
+    if (!this.rainLines) {
+      const N = this.lowPower ? 1200 : 2600;
+      this.rainPos = new Float32Array(N * 6);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(this.rainPos, 3).setUsage(THREE.DynamicDrawUsage));
+      this.rainLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xeef3ff, transparent: true, opacity: 0.75, depthWrite: false }));
+      this.rainLines.frustumCulled = false;
+      this.scene.add(this.rainLines);
+      for (let i = 0; i < N; i++) this.seedDrop(i, true);
+    }
+    const p = this.rainPos!;
+    const N = p.length / 6;
+    const active = Math.floor(N * Math.min(1, this.rain));
+    const fall = 90 * dt;
+    const t = this.controls.target;
+    const span = this.rainSpan();
+    for (let i = 0; i < N; i++) {
+      if (i >= active) { p[i * 6 + 1] = p[i * 6 + 4] = -999; continue; }
+      // Hujan mengikuti pandangan: butir yang tertinggal jauh dari pusat pandangan dipindah ke dekatnya.
+      if (Math.abs(p[i * 6] - t.x) > span || Math.abs(p[i * 6 + 2] - t.z) > span || p[i * 6 + 1] < -900) { this.seedDrop(i, true); continue; }
+      p[i * 6 + 1] -= fall; p[i * 6 + 4] -= fall;
+      p[i * 6] += fall * 0.08; p[i * 6 + 3] += fall * 0.08;
+      if (p[i * 6 + 4] < 0) this.seedDrop(i, false);
+    }
+    this.rainLines.visible = true;
+    (this.rainLines.material as THREE.LineBasicMaterial).opacity = 0.35 + 0.45 * this.rain;
+    this.rainLines.geometry.attributes.position.needsUpdate = true;
+  }
+
+  private rainSpan() { return Math.min(this.radius * 1.6, this.camera.position.distanceTo(this.controls.target) * 0.9); }
+
+  private seedDrop(i: number, anywhere: boolean) {
+    const p = this.rainPos!;
+    const t = this.controls.target;
+    const span = this.rainSpan();
+    const x = t.x + (Math.random() - 0.5) * span * 2, z = t.z + (Math.random() - 0.5) * span * 2;
+    const y = anywhere ? Math.random() * 160 : 140 + Math.random() * 40;
+    p[i * 6] = x; p[i * 6 + 1] = y; p[i * 6 + 2] = z;
+    p[i * 6 + 3] = x + 0.5; p[i * 6 + 4] = y - 4.5; p[i * 6 + 5] = z;
+  }
+
   /** Detik nyata per jam kota (default 16: satu hari sekitar 6,5 menit). */
   setClockSpeed(secondsPerHour: number) { this.clock.secondsPerHour = Math.max(0.5, secondsPerHour); }
   setHour(h: number) { this.clock.hour = ((h % 24) + 24) % 24; }
@@ -466,15 +537,19 @@ export class CityScene {
     else this.sun.position.set(t.x - s * 0.5, s * 1.5, t.z + s * 0.9);
     this.sun.target.position.copy(t);
     this.sun.color.setRGB(1, 0.95, 0.86).lerp(new THREE.Color(0xffa36b), dusk * 0.7).lerp(new THREE.Color(0x8fa6ff), night * 0.85);
-    this.sun.intensity = 0.45 + 1.95 * day + 0.3 * dusk;
+    this.sun.intensity = (0.45 + 1.95 * day + 0.3 * dusk) * (1 - 0.55 * this.rain);
     this.hemi.intensity = 0.6 + 0.85 * day;
     this.hemi.color.setRGB(0.89, 0.93, 1).lerp(new THREE.Color(0x4a5aa8), night * 0.8);
     this.hemi.groundColor.setRGB(0.73, 0.68, 0.84).lerp(new THREE.Color(0x2a2f55), night * 0.8);
-    this.scenery?.setTime(day, dusk);
+    // Hujan mendekati targetnya pelan-pelan (sekitar 6 detik).
+    this.rain += (ck.rainTarget() - this.rain) * Math.min(1, dt / 6);
+    this.updateRain(dt);
+    this.scenery?.setTime(day, dusk, this.rain);
     this.shared.uTime.value = this.timer.getElapsed();
     if (this.scenery) { this.shared.uSkyTop.value.copy(this.scenery.skyTop); this.shared.uSkyBot.value.copy(this.scenery.skyBottom); }
-    this.fabric?.setNight(night);
-    this.life?.setNight(night);
+    this.fabric?.setNight(night, this.rain);
+    this.life?.setNight(Math.max(night, this.rain * 0.6));
+    this.life?.setRain(this.rain);
     // Glow hanya malam, dan hanya untuk cahaya yang lebih terang dari putih (jendela, lampu, layar).
     if (this.bloom) { this.bloom.enabled = night > 0.2; this.bloom.strength = 0.5 * night; this.bloom.threshold = 1.0; this.bloom.radius = 0.35; }
     if (this.landmarks) {
@@ -512,7 +587,7 @@ export class CityScene {
     material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute vec2 wuv;\nattribute float seed;\nattribute float bord;\nattribute float bh;\nattribute float bstyle;\nattribute vec2 wseg;\nuniform float uBuild;\nvarying vec2 vWuv;\nvarying float vSeed;\nvarying float vLot;\nvarying float vBh;\nvarying float vStyle;\nvarying vec2 vWseg;")
+        .replace("#include <common>", "#include <common>\nattribute vec2 wuv;\nattribute float seed;\nattribute float bord;\nattribute float bh;\nattribute float bstyle;\nattribute vec2 wseg;\nattribute float bid;\nuniform float uBuild;\nvarying float vBid;\nvarying vec3 vWPos;\nvarying vec2 vWuv;\nvarying float vSeed;\nvarying float vLot;\nvarying float vBh;\nvarying float vStyle;\nvarying vec2 vWseg;")
         .replace("#include <begin_vertex>", `#include <begin_vertex>
 vWuv = wuv;
 vSeed = seed;
@@ -522,9 +597,16 @@ vWseg = wseg;
 float bg = clamp((uBuild - bord) / ${RISE.toFixed(3)}, 0.0, 1.0);
 bg = bg * bg * (3.0 - 2.0 * bg);
 vLot = bg < 0.004 ? 1.0 : 0.0;
-if (bg < 0.004) { transformed.y = 0.14; } else { transformed.y *= bg; }`);
+if (bg < 0.004) { transformed.y = 0.14; } else { transformed.y *= bg; }
+vBid = bid;
+vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>
+uniform float uCutId;
+uniform vec3 uCutC;
+uniform vec3 uCutN;
+varying float vBid;
+varying vec3 vWPos;
 uniform vec3 uGlow;
 uniform vec3 uGlass;
 uniform float uLit;
@@ -588,6 +670,15 @@ vec3 roomAt(vec2 f, vec2 sz, vec3 r, float rs, float lit, float night, float lod
         .replace(
           "#include <color_fragment>",
           `#include <color_fragment>
+// Gedung yang dibuka: setengah yang menghadap kamera disembunyikan supaya isinya terlihat.
+if (abs(vBid - uCutId) < 0.5 && (dot(vWPos - uCutC, uCutN) > 4.0 || vWuv.y < 0.0)) discard;
+// Gedung lain yang menghalangi pandangan ke gedung yang dibuka disembunyikan (jalur pandang bersih).
+if (uCutId > -0.5 && abs(vBid - uCutId) > 0.5) {
+  vec3 seg = uCutC - cameraPosition;
+  float sl = dot(seg, seg);
+  float tt = clamp(dot(vWPos - cameraPosition, seg) / max(sl, 1e-3), 0.0, 1.0);
+  if (tt < 0.9 && length(vWPos - (cameraPosition + seg * tt)) < 5.0 + 9.0 * tt) discard;
+}
 float isWall = step(0.0, vWuv.y);
 float flatRoof = step(-1.5, vWuv.y) * (1.0 - isWall);
 float uu = vWuv.x, vv = vWuv.y;
@@ -710,14 +801,22 @@ totalEmissiveRadiance += uGlow * (uHover * 0.05 + uSel * 0.09) * (0.4 + 0.6 * is
     const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
     depth.onBeforeCompile = (shader) => {
       shader.uniforms.uBuild = uniforms.uBuild;
+      shader.uniforms.uCutId = this.shared.uCutId;
+      shader.uniforms.uCutC = this.shared.uCutC;
+      shader.uniforms.uCutN = this.shared.uCutN;
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uCutId;\nuniform vec3 uCutC;\nuniform vec3 uCutN;\nvarying float vBid;\nvarying vec3 vWPos;")
+        .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nif (abs(vBid - uCutId) < 0.5 && dot(vWPos - uCutC, uCutN) > 4.0) discard;");
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute float bord;\nuniform float uBuild;")
+        .replace("#include <common>", "#include <common>\nattribute float bord;\nattribute float bid;\nuniform float uBuild;\nvarying float vBid;\nvarying vec3 vWPos;")
         .replace(
           "#include <begin_vertex>",
           `#include <begin_vertex>
 float bg = clamp((uBuild - bord) / ${RISE.toFixed(3)}, 0.0, 1.0);
 bg = bg * bg * (3.0 - 2.0 * bg);
-if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }`,
+if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }
+vBid = bid;
+vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
         );
     };
     return { material, uniforms, depth };
@@ -744,9 +843,82 @@ if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }`,
       if (!dm || !hit.face) continue;
       const bi = dm.owner[hit.face.a];
       const b = dm.bldg.find((q) => q.id === bi);
-      if (b && (dm.dev * (1 + RISE) - b.order) / RISE > 0.5) return dm.id;
+      if (b && (dm.dev * (1 + RISE) - b.order) / RISE > 0.5) { this.pickedBuilding = bi; return dm.id; }
     }
+    this.pickedBuilding = -1;
     return null;
+  }
+  private pickedBuilding = -1;
+  private buildingDist = 50;
+
+  // --- Gedung yang dibelah --------------------------------------------------------------------------------------
+
+  /** Membuka gedung: bagian depan disembunyikan, lantai dan kegiatannya tampak. */
+  openBuilding(bi: number) {
+    if (!this.map || bi < 0 || bi === this.interiorId) return;
+    this.closeBuilding();
+    const raw = this.map.buildings[bi];
+    const dm = this.districtMeshes.find((q) => q.bldg.some((b) => b.id === bi));
+    const d = this.districts.find((q) => q.id === dm?.id);
+    const place = this.life?.placeOf(bi);
+    const kind: BuildingKind = bi === this.hallId ? "hall" : (place?.kind ?? "home");
+    this.interior = new BuildingInterior(this.cityGroup, {
+      id: bi, name: bi === this.hallId ? this.cityLabel : place?.name ?? "Building", kind, style: styleOf(raw, bi), h: raw.h, polygon: footprintOf(raw, bi),
+      district: { id: d?.id ?? "", label: d?.label ?? "", color: d ? DISTRICT_COLORS[d.kind] : "#9aa6cf", kind: d?.kind ?? "idle" },
+    }, () => this.agenda, () => this.districts.map((q) => ({ label: q.label, share: q.weight, color: DISTRICT_COLORS[q.kind] })));
+    this.interiorId = bi;
+    this.shared.uCutId.value = bi;
+    const b = dm?.bldg.find((q) => q.id === bi);
+    if (b) {
+      this.shared.uCutC.value.set(b.x, 0, b.z);
+      // Kamera menyorot titik paling ramai di dalam, hampir mendatar untuk gedung tinggi (seperti rumah boneka).
+      const hs = this.interior.hotspot();
+      // Bidang potong lewat 4 m di depan titik yang disorot, supaya kegiatannya tidak ikut terpotong.
+      this.shared.uCutC.value.set(hs.x, hs.y, hs.z);
+      // Kamera berdiri di luar gedung: lebih jauh dari titik terjauh tapak.
+      const fp = footprintOf(raw, bi);
+      let ext = 0;
+      for (let k = 0; k < fp.length; k += 2) ext = Math.max(ext, Math.hypot(fp[k] - hs.x, fp[k + 1] - hs.z));
+      this.buildingDist = Math.max(raw.h > 22 ? 50 : 42, ext + 22);
+      this.focusOn(hs.x, hs.z, this.buildingDist, raw.h > 22 ? 1.3 : 0.95, hs.y);
+    }
+    this.cb.onBuilding?.(this.interior.info());
+  }
+
+  /** Kamera menyorot satu lantai gedung yang sedang dibuka. */
+  focusFloor(level: number) {
+    if (!this.interior || !this.map) return;
+    const s = this.interior.floorSpot(level);
+    this.shared.uCutC.value.set(s.x, s.y, s.z);
+    this.focusOn(s.x, s.z, this.buildingDist, 1.3, s.y);
+  }
+
+  closeBuilding() {
+    if (!this.interior) return;
+    this.interior.dispose();
+    this.interior = null;
+    this.interiorId = -1;
+    this.shared.uCutId.value = -1;
+    this.cb.onBuilding?.(null);
+  }
+
+  /** Mencatat kejadian sebagai agenda kota (tampil di layar balai kota, ruang rapat, dan panel gedung). */
+  private remember(ev: LifeEvent) {
+    const label = (id: string) => this.districts.find((d) => d.id === id)?.label ?? id;
+    const amt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
+    let item: AgendaItem | null = null;
+    const at = this.timer.getElapsed();
+    switch (ev.type) {
+      case "transfer": item = { kind: "transfer", text: `Rebalance ${label(ev.from)} → ${label(ev.to)} · ${amt(ev.amount)} AUSD`, at, district: ev.to }; break;
+      case "propose": item = { kind: "propose", text: `Analyst proposes ${label(ev.from)} → ${label(ev.to)} · ${amt(ev.amount)} AUSD`, at, district: ev.to }; break;
+      case "approve": item = { kind: "approve", text: "Mayor approves the Analyst's proposal", at }; break;
+      case "alert": item = { kind: "alert", text: `Satpam evacuates ${label(ev.at)}`, at, district: ev.at }; break;
+      case "harvest": item = { kind: "harvest", text: `Mayor collects ${ev.amount.toFixed(1)} AUSD in fees`, at }; break;
+      case "festival": item = { kind: "festival", text: ev.label ?? `Mayor hosts an event at ${label(ev.at)}`, at, district: ev.at }; break;
+      case "deposit": item = { kind: "deposit", text: `A resident deposits ${amt(ev.amount)} AUSD`, at }; break;
+      case "withdraw": item = { kind: "withdraw", text: `A resident withdraws ${amt(ev.amount)} AUSD`, at }; break;
+    }
+    if (item) { this.agenda.push(item); if (this.agenda.length > 20) this.agenda.shift(); }
   }
 
   private onPointerMove = (ev: PointerEvent) => {
@@ -773,7 +945,9 @@ if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }`,
       this.cb.onInspect?.(info);
       if (info) return;
     }
-    this.cb.onSelect?.(this.pick(ev));
+    const district = this.pick(ev);
+    this.cb.onSelect?.(district);
+    if (this.pickedBuilding >= 0) this.openBuilding(this.pickedBuilding); else this.closeBuilding();
   };
   private onPointerLeave = () => {
     if (this.hovered !== null) { this.hovered = null; this.applyHighlight(); this.cb.onHover?.(null); }
@@ -851,11 +1025,19 @@ if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }`,
     this.applyTime(dt);
     this.controls.update();
     this.life?.update(dt, this.camera, this.rect);
+    if (this.interior) {
+      const cp = this.camera.position;
+      const n = this.shared.uCutN.value.set(cp.x - this.shared.uCutC.value.x, 0, cp.z - this.shared.uCutC.value.z);
+      if (n.lengthSq() > 1e-6) n.normalize();
+      this.interior.update(dt, this.timer.getElapsed(), this.clock.hour, cp, 1 - this.clock.daylight, this.shared.uCutC.value);
+      this.buildingClock -= dt;
+      if (this.buildingClock <= 0) { this.buildingClock = 0.5; this.cb.onBuilding?.(this.interior.info()); }
+    }
     this.tickClock -= dt;
     if (this.tickClock <= 0 && this.life) {
       this.tickClock = 0.5;
       this.lastStats = this.life.stats();
-      this.cb.onTick?.({ time: this.clock.label, phase: this.clock.phase, hour: this.clock.hour, stats: this.lastStats });
+      this.cb.onTick?.({ time: this.clock.label, phase: this.rain > 0.5 ? `${this.clock.phase} · rain` : this.clock.phase, hour: this.clock.hour, stats: this.lastStats });
     }
     this.inspectClock -= dt;
     if (this.inspectClock <= 0 && this.life && this.cb.onInspect) {
@@ -864,7 +1046,7 @@ if (bg < 0.004) { transformed.y = -500.0; } else { transformed.y *= bg; }`,
       if (info) this.cb.onInspect(info);
     }
     if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera);
-    if (this.life) this.cb.onFloaters?.(this.life.floaters);
+    if (this.life) this.cb.onFloaters?.(this.interior ? [...this.life.floaters, ...this.interior.labels(this.camera, this.rect)] : this.life.floaters);
 
     if (this.cb.onLabels) {
       this.labelBuf.length = 0;
