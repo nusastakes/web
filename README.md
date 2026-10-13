@@ -4,8 +4,10 @@ Antarmuka web **Nusastakes**, game kota di Monad. Setiap kota adalah vault ERC-4
 menitipkan AUSD dengan passkey, tanpa seed phrase dan tanpa token gas, dan walikota hanya mendapat fee dari keuntungan
 penduduknya. Kotanya tampil sebagai kota 3D dari peta asli yang tumbuh mengikuti dana dan hidup mengikuti kejadian onchain.
 
-Jaringan: **Monad testnet** (chainId 10143). Yield di testnet adalah simulasi yang mengikuti APY vault AUSD di mainnet,
+Jaringan: **Monad testnet** (chainId 10143). Yield di testnet adalah simulasi yang mengikuti APY pool mainnet,
 dan selalu diberi label "simulated" di layar.
+
+**Live: https://nusastakes.vercel.app** (Vercel, proyek `nusastakes`; relayer https://relayer-production-39e1.up.railway.app).
 
 ## Halaman
 
@@ -22,7 +24,11 @@ dan selalu diberi label "simulated" di layar.
 | Akun passkey (Mera) | Satu prompt untuk membuat akun; masuk lagi tanpa state lokal; sesi terkunci otomatis setelah 10 menit diam; tarik dana selalu meminta passkey baru | `src/lib/wallet.tsx` |
 | Setor dan tarik | Penduduk hanya menandatangani `permit`; relayer mengirim transaksi dan membayar gas | `src/lib/actions.ts`, `src/lib/relayer.ts` |
 | Dirikan kota | Walikota memilih nama, komunitas, fee (maksimal 20%), dan area: peta bawaan atau area sembarang yang dipilih di peta OpenStreetMap (Leaflet; kotak 360, 520, atau 800 m); bangunan dan jalan diambil dari OpenStreetMap, dengan lahan kosong prosedural bila data gagal dimuat | `src/components/sheets/FoundCitySheet.tsx`, `AreaPickerModal.tsx`, `src/lib/osm.ts` |
-| Layanan protokol | Tiap distrik kota adalah cermin satu protokol Monad (Bank, Brankas, Menara Staking, Pasar) dengan APY dan TVL mainnet langsung dari katalog relayer (`GET /catalog`, sumber DefiLlama) dan dana simulasi di testnet; walikota memilih 1 sampai 6 layanan saat mendirikan kota; landmark 3D per jenis | `src/lib/catalog.ts`, `ServicePicker.tsx`, `src/lib/scene/services3d.ts` |
+| Layanan protokol | Tiap distrik kota adalah cermin satu pool protokol Monad (18 layanan: Bank, Brankas, Menara Staking, Pasar) dengan APY dan TVL mainnet langsung dari katalog relayer (`GET /catalog`) dan dana simulasi di testnet; slot layanan saat mendirikan kota dibuka bertahap (3, lalu 5, lalu 8) lewat tahap kota terbaik atau dana walikota sendiri di kotanya, tanpa top-up ke platform (aturan aplikasi; kontrak tetap maksimal 8); lencana "Bisa disetel"; landmark 3D per jenis | `src/lib/catalog.ts`, `ServicePicker.tsx`, `src/lib/tier.ts`, `src/lib/scene/services3d.ts` |
+| Setel layanan | Dari kartu gedung: walikota menyetel layanan sebatas hak penyetor di protokol aslinya (hadiah token atau bunga dasar saja, looping bila protokol menerima AUSD sebagai jaminan, rentang harga Uniswap v3), dengan perkiraan hasil dari rumus yang sama dengan relayer dan angka yang benar-benar tertulis di feed; pengunjung melihat setelan yang sama tanpa bisa mengubah | `src/components/sheets/TuningSheet.tsx`, `src/lib/tuning.ts` |
+| Aturan kota dan autopilot | Walikota menulis aturan sendiri ("jika ..., maka pindahkan atau setel ...") atau menyalakan aturan siap pakai, menandatanganinya (EIP-712 `CityRules`), dan mengizinkan autopilot sebagai session key yang hanya boleh memindah dan menyetel dana kota; log menautkan tiap transaksi autopilot | `src/components/sheets/RulesSheet.tsx`, `src/lib/rules.ts` |
+| Panggung | Loket kota untuk pengunjung (`CityServices`): luncurkan token di kurva harga, beli dan jual; walikota menyalakan layanan dan memilih fee 0–3%, yang dialirkan ke vault kota | `src/components/sheets/PanggungSheet.tsx`, `src/lib/panggung.ts` |
+| Skor kota | Tahap kota di Meja Walikota dari `GET /score/:city` (variasi layanan, jumlah layanan aktif, kekayaan, penghasilan, lalu lintas luar) dan kartu mingguan dari `GET /history/:city`; keramaian 3D mengikuti `crowd` (lalu lintas dibatasi kekayaan) | `src/lib/cityStats.ts`, `MayorDesk.tsx`, `App.tsx` |
 | Meja Walikota | Untuk walikota awam: tahap kota dan kemajuannya, langkah berikutnya yang bisa diketuk, kesehatan dana dalam bahasa sehari-hari, tiga strategi cepat satu ketukan, saran dari aturan sederhana (bukan AI), glosarium; kartu ringkas di layar utama | `src/components/sheets/MayorDesk.tsx`, `MayorStrip.tsx`, `src/lib/coach.ts` |
 | Balai kota (walikota) | Pindah dana antar distrik dalam batas kontrak, kunci wakil untuk kerja harian tanpa prompt, buku strategi tersegel, staf AI, desain kota | `src/components/sheets/ManageSheet.tsx` dan panel di sebelahnya |
 | Buku strategi tersegel | Alasan walikota dienkripsi di perangkat dengan kunci dari passkey; hanya hash ciphertext yang tercatat onchain; satu entri bisa dibuka publik di akhir musim | `src/lib/book.ts`, `BookPanel.tsx` |
@@ -63,6 +69,7 @@ Variabel lingkungan (opsional, di `.env.local`):
 |---|---|
 | `NEXT_PUBLIC_RELAYER_URL` | `http://localhost:8787`; relayer yang di-host: `https://relayer-production-39e1.up.railway.app` |
 | `NEXT_PUBLIC_MONAD_TESTNET_RPC` | `https://testnet-rpc.monad.xyz` |
+| `NEXT_PUBLIC_MONAD_TESTNET_RPC_FALLBACKS` | `https://rpc.ankr.com/monad_testnet,https://monad-testnet.drpc.org` (baca dan kirim pindah ke sini bila RPC utama menolak) |
 | `NEXT_PUBLIC_FACTORY` | alamat `CityFactory` dari `src/lib/deployment.json` |
 
 Skrip lain:
@@ -74,6 +81,9 @@ node scripts/build-demo.mjs   # tulis demo/city-demo.html: kota 3D mandiri dalam
 ```
 
 Passkey terikat ke domain (rpId). Akun yang dibuat di `localhost` tidak bisa dipakai di domain lain.
+
+Deploy: `vercel deploy --prod` dari folder ini (`vercel.json` menetapkan framework Next.js; `.vercelignore` mencegah file
+env terunggah). Di Vercel hanya `NEXT_PUBLIC_RELAYER_URL` yang diisi.
 
 ## Pengujian
 
@@ -87,6 +97,10 @@ Passkey terikat ke domain (rpId). Akun yang dibuat di `localhost` tidak bisa dip
   - sewa Analis lewat marketplace, minta usulan, setujui satu ketukan; sewa Satpam dan agen komunitas
 - Logika kota (rute, lampu lalu lintas, jadwal harian) diuji dengan simulasi satu hari penuh tanpa layar: tanpa kendaraan
   macet permanen dan tanpa angka tidak valid.
+- Sesi di situs produksi (14 Okt 2026, Brave dengan authenticator virtual PRF): akun baru, dana dari relayer, dirikan kota
+  dengan layanan bersetelan, setor 200 AUSD, simpan setelan Neverland 2×, simpan aturan bertanda tangan, nyalakan Panggung,
+  dan luncurkan token; semuanya terverifikasi on-chain (kota `0xfb4Bf15294ed593931fc597482F48a24e9639DF4`). Strategi cepat
+  dan izin autopilot dari UI belum terkonfirmasi di sesi itu; autopilot sudah terbukti jalan di kota uji lain.
 - `tsc --noEmit`, `eslint`, dan `next build` lulus.
 
 **Belum diuji:**
@@ -113,8 +127,8 @@ Open Buildings (CC BY 4.0) dan Microsoft ML Buildings (ODbL). Nama toko dan gedu
 
 ## Penggunaan alat AI
 
-Dibangun dengan Claude Code: Claude Opus mengerjakan frontend ini, Claude Sonnet mengerjakan kontrak, relayer, dan
-workflow CRE. Keluaran AI diperiksa dengan uji di atas; yang belum diuji ditulis di bagian "Belum diuji".
+Dibangun dengan Claude Code: Claude Opus mengerjakan frontend ini; sampai 13 Okt Claude Sonnet mengerjakan kontrak,
+relayer, dan workflow CRE, dan mulai 14 Okt Claude Opus mengerjakan semuanya. Keluaran AI diperiksa dengan uji di atas; yang belum diuji ditulis di bagian "Belum diuji".
 
 ## Komponen yang sudah ada sebelumnya
 
