@@ -25,6 +25,8 @@ export interface District {
   protocolTvlUsd?: number | null;
   /** True bila adapter bersetelan (TunedMirrorAdapter): walikota bisa menyetel layanan ini sebatas hak penyetor di protokolnya. */
   tunable?: boolean;
+  /** True bila vault mengkarantina adapter ini (nilainya gagal dibaca); siapa pun bisa memulihkannya begitu terbaca lagi. */
+  quarantined?: boolean;
 }
 
 export interface CityView {

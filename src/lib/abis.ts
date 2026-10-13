@@ -46,6 +46,7 @@ export const vaultAbi = parseAbi([
   "function sessionWindowShifted() view returns (uint256)",
   "function restoreAdapter(address adapter)",
   "function style() view returns (bytes32)",
+  "function setStyle(bytes32 newStyle)",
   "event AdapterQuarantined(address indexed adapter)",
   "event AdapterRestored(address indexed adapter, uint256 assets)",
   "event PlanKeyRevealed(bytes32 indexed entryId, bytes32 key)",
@@ -126,4 +127,9 @@ export const marketplaceAbi = parseAbi([
   "function hire(uint256 listingId, uint64 periods, bytes32 expectedTerms, address hook, bytes data) returns (uint64)",
   "function hireWithPermit(uint256 listingId, uint64 periods, bytes32 expectedTerms, address hook, bytes data, uint256 deadline, uint8 v, bytes32 r, bytes32 s) returns (uint64)",
   "function termsHash(uint256 listingId) view returns (bytes32)",
+]);
+
+/** ERC-8004 Reputation Registry (testnet): walikota menilai agen yang ia sewa; registri menolak penilaian dari pemilik agen. */
+export const reputationAbi = parseAbi([
+  "function giveFeedback(uint256 agentId, int128 value, uint8 valueDecimals, string tag1, string tag2, string endpoint, string feedbackURI, bytes32 feedbackHash)",
 ]);

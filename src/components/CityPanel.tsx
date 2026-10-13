@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { vaultAbi } from "@/lib/abis";
+import { contractTx } from "@/lib/actions";
+import { humanError } from "@/lib/errors";
+import { emitChange } from "@/lib/hooks";
+import { useWallet } from "@/lib/wallet";
 import { getReport } from "@/lib/relayer";
 import { APP, districtName } from "@/lib/copy-app";
 import { useLang } from "@/lib/lang";
@@ -30,7 +35,7 @@ function Row({ d, active, onClick }: { d: District; active: boolean; onClick: ()
     <button onClick={onClick} className={cx("flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition", active ? "bg-accent-soft" : "hover:bg-slate-900/5")}>
       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: DISTRICT_COLORS[d.kind] }} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-ink">{districtName(lang, d)}</span>
+        <span className="flex items-center gap-1 truncate text-sm font-medium text-ink">{districtName(lang, d)}{d.quarantined && <Badge tone="warn">{t.quarantined}</Badge>}</span>
         <span className="block truncate text-[11px] text-ink-soft">{d.category ? `${CATALOG_COPY[lang].category[d.category].name} · ${d.protocol ?? ""}` : d.protocol ?? (d.kind === "idle" ? t.notPlaced : "")}</span>
       </span>
       <span className="shrink-0 text-right">
@@ -51,6 +56,18 @@ export default function CityPanel({ city, selectedId, onSelect, me, onTune }: Pr
   const nowSec = useNowSeconds();
   const [report, setReport] = useState<{ city: string; text: string } | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const w = useWallet();
+  const [restore, setRestore] = useState<{ id: string; busy: boolean; msg?: string; error?: string } | null>(null);
+  // `restoreAdapter` hanya berhasil bila nilai adapter terbaca lagi; siapa pun yang punya sesi boleh mengirimnya.
+  const tryRestore = async (d: District) => {
+    if (!city.vault || !d.adapter) return;
+    setRestore({ id: d.id, busy: true });
+    try {
+      await contractTx(w, { address: city.vault, abi: vaultAbi, functionName: "restoreAdapter", args: [d.adapter] }, { ceremony: false, label: t.restore });
+      setRestore({ id: d.id, busy: false, msg: t.restored });
+      emitChange();
+    } catch (e) { setRestore({ id: d.id, busy: false, error: humanError(e) }); }
+  };
   const readReport = async () => {
     if (!city.vault) return;
     if (report?.city === city.vault) { setReport(null); return; }
@@ -146,6 +163,16 @@ export default function CityPanel({ city, selectedId, onSelect, me, onTune }: Pr
               </p>
             )}
             {selected.kind === "idle" && <p className="text-[11px] leading-relaxed text-ink-soft">{t.idleNote}</p>}
+            {selected.quarantined && (
+              <div className="space-y-1.5 rounded-lg bg-amber-500/10 p-2 text-[11px] leading-relaxed text-ink">
+                <p>{t.quarantineNote}</p>
+                {w.status === "ready" && w.address && (
+                  <button className="btn btn-ghost w-full !py-1 text-xs" disabled={restore?.busy} onClick={() => void tryRestore(selected)}>{restore?.busy && restore.id === selected.id ? t.restoring : t.restore}</button>
+                )}
+                {restore?.id === selected.id && restore.msg && <p className="text-good">{restore.msg}</p>}
+                {restore?.id === selected.id && restore.error && <p className="text-bad">{restore.error}</p>}
+              </div>
+            )}
             {selected.tunable && onTune && (
               <button className="btn btn-ghost w-full !py-1.5 text-xs" onClick={() => onTune(selected.id)}>
                 {isMayor ? TUNING[lang].open : TUNING[lang].view}

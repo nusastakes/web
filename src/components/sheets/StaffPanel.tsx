@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { guardianAbi } from "@/lib/abis";
+import { guardianAbi, reputationAbi } from "@/lib/abis";
 import { TX_STEPS, contractTx, hireFlow, type Step } from "@/lib/actions";
 import { publicClient } from "@/lib/chain";
 import { ADDR } from "@/lib/config";
@@ -101,6 +101,11 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
       await load();
     } catch (e) { setNote(null); setError(humanError(e)); }
   };
+  /** BC.6: penilaian sungguhan dari walikota (nilai 20 sampai 100), menggantikan hanya penilaian contoh tim. */
+  const rate = (a: MarketAgent, stars: number) => run(`r${a.id}`, t.rated, (report) => contractTx(w, {
+    address: ADDR.reputation, abi: reputationAbi, functionName: "giveFeedback",
+    args: [BigInt(a.erc8004!.agentId), BigInt(stars * 20), 0, "city-staff", "mayor-review", `${location.origin}/city?c=${vault}`, "", `0x${"0".repeat(64)}`],
+  }, { ceremony: false, label: t.rate, report }));
   const readReport = async () => {
     setReport("…");
     try { const r = await getReport(vault, 7); setReport(typeof r.text === "string" ? r.text.replace(/\*\*/g, "") : String(r.status ?? t.noReport)); }
@@ -153,7 +158,15 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
                 {a.id === "analis" && on && <button className="btn btn-ghost !px-2 !py-1 text-[11px]" disabled={!!busy} onClick={ask}>{t.ask}</button>}
                 {a.id === "humas" && on && <button className="btn btn-ghost !px-2 !py-1 text-[11px]" onClick={readReport}>{t.readReport}</button>}
               </div>
-              {busy?.key === a.id && <div className="mt-2"><StepList steps={busy.steps} /></div>}
+              {a.erc8004 && (on || a.hiredInCity) && (
+                <div className="mt-1.5 flex items-center gap-1 text-[11px] text-ink-soft">
+                  <span>{t.rate}</span>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} className="rounded px-0.5 text-sm leading-none text-amber-500 hover:scale-110 disabled:opacity-40" disabled={!!busy} aria-label={`${n}/5`} onClick={() => rate(a, n)}>★</button>
+                  ))}
+                </div>
+              )}
+              {(busy?.key === a.id || busy?.key === `r${a.id}`) && <div className="mt-2"><StepList steps={busy.steps} /></div>}
               {a.id === "humas" && report && <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-900/[0.04] p-2 text-[11px] text-ink">{report}</div>}
             </li>
           );

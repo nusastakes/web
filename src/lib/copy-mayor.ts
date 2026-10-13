@@ -99,6 +99,7 @@ const EN = {
     design: "City design", designNote: "Make your city beautiful. This is looks only: it never changes residents' money. Bigger cities unlock more civic works.",
     unlocksAt: (n: string) => `Unlocks at about ${n} AUSD in the city`,
     styleShared: "Saved for everyone: residents see this look when they open the city.", styleSaving: "Saving for everyone…",
+    styleChain: "Record this look on chain", styleChainNote: "Optional: the look is also kept in the city contract (setStyle), so it survives without our server.", styleChainDone: "Recorded on chain.", styleChainLong: "This look is too long to record on chain (32 characters at most).",
     styleErr: (e: string) => `Saved in this browser only (${e}).`, styleLocal: "Saved in this browser.", relayerError: "relayer error", previewLink: " Preview link: ",
   },
   staff: {
@@ -108,6 +109,7 @@ const EN = {
     hiredUntil: (d: string) => `Hired until ${d}`, available: "Available", release: "Release", hire: "Hire", na: "Not available right now.",
     perWeek: (p: string) => `${p} AUSD per week`, free: "Free", community: "Community",
     erc: (id: string) => `ERC-8004 #${id}`, ercTitle: (registry: string) => `Registered in the ERC-8004 Identity Registry: ${registry}`,
+    rate: "Rate this agent (on chain, ERC-8004):", rated: "Thanks: your rating is recorded on chain. The average updates within a minute.",
     noRating: "No ratings yet", rating: (avg: number, n: number) => `Rating ${avg} (${n})`, ratingSeed: (avg: number, n: number) => `Initial rating by the team: ${avg} (${n}), a demo, not user reviews`,
     ask: "Ask for a proposal now", readReport: "Read this week's report", asking: "Asking the Analyst…",
     proposals: (n: number) => `Analyst proposals${n ? ` · ${n} waiting` : ""}`, deploy: "Plaza → yield district", withdraw: "Yield district → Plaza", move: "Move funds", approve: "Approve (one tap)",
@@ -180,6 +182,7 @@ const ID: typeof EN = {
     design: "Desain kota", designNote: "Buat kota Anda indah. Ini hanya tampilan: tidak pernah mengubah uang penduduk. Kota yang lebih besar membuka lebih banyak karya sipil.",
     unlocksAt: (n) => `Terbuka pada sekitar ${n} AUSD di kota`,
     styleShared: "Tersimpan untuk semua orang: penduduk melihat tampilan ini saat membuka kota.", styleSaving: "Menyimpan untuk semua orang…",
+    styleChain: "Catat tampilan ini di chain", styleChainNote: "Opsional: tampilan juga disimpan di kontrak kota (setStyle), jadi tetap ada tanpa server kami.", styleChainDone: "Tercatat di chain.", styleChainLong: "Tampilan ini terlalu panjang untuk dicatat di chain (paling banyak 32 karakter).",
     styleErr: (e) => `Hanya tersimpan di browser ini (${e}).`, styleLocal: "Tersimpan di browser ini.", relayerError: "galat relayer", previewLink: " Tautan pratinjau: ",
   },
   staff: {
@@ -189,6 +192,7 @@ const ID: typeof EN = {
     hiredUntil: (d) => `Disewa sampai ${d}`, available: "Tersedia", release: "Cabut", hire: "Sewa", na: "Belum tersedia sekarang.",
     perWeek: (p) => `${p} AUSD per minggu`, free: "Gratis", community: "Komunitas",
     erc: (id) => `ERC-8004 #${id}`, ercTitle: (registry) => `Terdaftar di Identity Registry ERC-8004: ${registry}`,
+    rate: "Beri nilai agen ini (on-chain, ERC-8004):", rated: "Terima kasih: penilaian Anda tercatat di chain. Rata-ratanya diperbarui dalam satu menit.",
     noRating: "Belum ada penilaian", rating: (avg, n) => `Penilaian ${avg} (${n})`, ratingSeed: (avg, n) => `Penilaian awal dari tim: ${avg} (${n}), contoh, bukan ulasan pengguna`,
     ask: "Minta usulan sekarang", readReport: "Baca laporan minggu ini", asking: "Bertanya ke Analis…",
     proposals: (n) => `Usulan Analis${n ? ` · ${n} menunggu` : ""}`, deploy: "Alun-alun → distrik bunga", withdraw: "Distrik bunga → Alun-alun", move: "Pindahkan dana", approve: "Setujui (satu ketukan)",

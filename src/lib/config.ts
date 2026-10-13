@@ -32,6 +32,8 @@ export const ADDR = {
   marketplace: deployment.contracts.AgentMarketplace as Hex,
   /** Loket kota untuk pengguna luar (Panggung; prediksi dikunci di kontrak). */
   cityServices: deployment.contracts.CityServices as Hex,
+  /** ERC-8004 Reputation Registry bersama di Monad testnet. */
+  reputation: "0x8004B663056A597Dffe9eCcC1965A193B7388713" as Hex,
 };
 
 export const AUSD_DECIMALS = deployment.asset.decimals;

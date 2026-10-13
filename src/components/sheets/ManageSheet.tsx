@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { stringToHex } from "viem";
 import { writeEntry } from "@/lib/book";
 import BookPanel from "./BookPanel";
 import StaffPanel from "./StaffPanel";
@@ -67,6 +68,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [deputySteps, setDeputySteps] = useState<Step[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [styleChain, setStyleChain] = useState<"idle" | "busy" | "done">("idle");
   const [gasBusy, setGasBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [seal, setSeal] = useState(true);
@@ -332,6 +334,22 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                 {styleSync === "shared" ? t.styleShared : styleSync === "saving" ? t.styleSaving : styleSync === "error" ? t.styleErr(styleError ?? t.relayerError) : t.styleLocal}
                 {styleCode && <>{t.previewLink}<code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code></>}
               </p>
+              {/* B2.26: gaya kota juga bisa dicatat di kontrak (`setStyle(bytes32)`), selain di relayer. */}
+              {city.vault && styleCode && (
+                <div className="space-y-1 rounded-xl bg-slate-900/[0.04] p-2.5">
+                  <p className="text-[11px] leading-relaxed text-ink-soft">{new TextEncoder().encode(styleCode).length > 32 ? t.styleChainLong : t.styleChainNote}</p>
+                  <button className="btn btn-ghost w-full !py-1.5 text-xs" disabled={styleChain === "busy" || new TextEncoder().encode(styleCode).length > 32}
+                    onClick={async () => {
+                      setStyleChain("busy"); setError(null);
+                      try {
+                        await contractTx(w, { address: city.vault!, abi: vaultAbi, functionName: "setStyle", args: [stringToHex(styleCode, { size: 32 })] }, { ceremony: true, label: t.styleChain });
+                        setStyleChain("done");
+                      } catch (e) { setError(humanError(e)); setStyleChain("idle"); }
+                    }}>
+                    {styleChain === "busy" ? <Spinner /> : null} {styleChain === "done" ? t.styleChainDone : t.styleChain}
+                  </button>
+                </div>
+              )}
             </section>}
             {error && <Notice tone="error">{error}</Notice>}
           </div>

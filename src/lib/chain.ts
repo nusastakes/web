@@ -65,6 +65,8 @@ export async function loadCities(): Promise<CityView[]> {
       { address: a, abi: adapterAbi, functionName: "sourceId" } as const,
       // Hanya adapter bersetelan yang punya `baseSourceId`; adapter lain gagal di sini, dan itu wajar.
       { address: a, abi: tunedAdapterAbi, functionName: "baseSourceId" } as const,
+      // Adapter yang dikarantina vault (nilainya tidak terbaca) tidak dihitung di total aset sampai dipulihkan.
+      { address: c.vault, abi: vaultAbi, functionName: "quarantined", args: [a] } as const,
     ]),
   ]);
   const res = await publicClient.multicall({ allowFailure: true, contracts: reads });
@@ -77,12 +79,14 @@ export async function loadCities(): Promise<CityView[]> {
       const sim = res[cursor++];
       const src = res[cursor++];
       const base = res[cursor++];
+      const q = res[cursor++];
       return {
         address: a as Hex,
         assets: total.status === "success" ? (total.result as bigint) : 0n,
         simulated: sim.status === "success" ? Boolean(sim.result) : false,
         sourceId: (src.status === "success" ? src.result : null) as Hex | null,
         baseSourceId: (base.status === "success" ? base.result : null) as Hex | null,
+        quarantined: q.status === "success" ? Boolean(q.result) : false,
       };
     });
     return { c, idle: idle.status === "success" ? (idle.result as bigint) : 0n, adapters };
@@ -110,7 +114,7 @@ export async function loadCities(): Promise<CityView[]> {
             return {
               id: a.address, kind: CATEGORY_KIND[svc.category], label: svc.name, protocol: svc.protocol,
               weight: w(a.assets), assets: ausdToNumber(a.assets), apyBps, simulated: true, adapter: a.address,
-              serviceId: svc.id, category: svc.category, protocolTvlUsd: svc.tvlUsd, tunable: tuned,
+              serviceId: svc.id, category: svc.category, protocolTvlUsd: svc.tvlUsd, tunable: tuned, quarantined: a.quarantined,
             };
           }
           return {
@@ -123,6 +127,7 @@ export async function loadCities(): Promise<CityView[]> {
             apyBps: apy?.apyBps ?? null,
             simulated: a.simulated,
             adapter: a.address,
+            quarantined: a.quarantined,
           };
         }),
       ];
