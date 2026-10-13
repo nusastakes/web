@@ -35,9 +35,19 @@ export const vaultAbi = parseAbi([
   "function rebalance(address from, address to, uint256 amount, bytes32 planHash)",
   "function setSessionKey(address newSessionKey, uint64 expiry, uint16 shiftBps)",
   "function harvestFee()",
+  "function redeem(uint256 shares, address receiver, address owner) returns (uint256)",
   "function revealPlanKey(bytes32 entryId, bytes32 key)",
   "function setFee(uint16 newFeeBps)",
   "function setMaxShift(uint16 newMaxShiftBps)",
+  "function quarantinedCount() view returns (uint256)",
+  "function quarantined(address adapter) view returns (bool)",
+  "function sessionBudgetBps() view returns (uint16)",
+  "function sessionWindowStart() view returns (uint64)",
+  "function sessionWindowShifted() view returns (uint256)",
+  "function restoreAdapter(address adapter)",
+  "function style() view returns (bytes32)",
+  "event AdapterQuarantined(address indexed adapter)",
+  "event AdapterRestored(address indexed adapter, uint256 assets)",
   "event PlanKeyRevealed(bytes32 indexed entryId, bytes32 key)",
   "event FeeSet(uint16 oldFeeBps, uint16 newFeeBps)",
   "event Rebalanced(address indexed caller, address indexed from, address indexed to, uint256 amount, bytes32 planHash)",
@@ -53,6 +63,37 @@ export const adapterAbi = parseAbi([
   "function sourceId() view returns (bytes32)",
 ]);
 
+/** Adapter bersetelan (TunedMirrorAdapter): setelan kota disimpan di adapter; hanya walikota atau wakilnya yang boleh mengubah. */
+export const tunedAdapterAbi = parseAbi([
+  "function baseSourceId() view returns (bytes32)",
+  "function tuning() view returns (bytes)",
+  "function tunedAt() view returns (uint64)",
+  "function setTuning(bytes newTuning)",
+  "event TuningSet(address indexed vault, address indexed by, bytes tuning)",
+]);
+
+/** Loket kota (CityServices): Panggung (peluncur token dengan kurva harga); prediksi dikunci di kontrak yang di-deploy. */
+export const cityServicesAbi = parseAbi([
+  "function services(address city, uint8 kind) view returns (bool on, uint16 feeBps)",
+  "function stats(address city, uint8 kind) view returns (uint128 volume, uint128 fees, uint64 uses)",
+  "function setService(address city, uint8 kind, bool on, uint16 feeBps)",
+  "function launchFee() view returns (uint256)",
+  "function MAX_FEE_BPS() view returns (uint16)",
+  "function predictionEnabled() view returns (bool)",
+  "function launch(address city, string name, string symbol, uint256 buyAmount, uint256 minTokens) returns (address token, uint256 tokensOut)",
+  "function buy(address token, uint256 amount, uint256 minTokens) returns (uint256 tokensOut)",
+  "function sell(address token, uint256 tokensIn, uint256 minOut) returns (uint256 out)",
+  "function quoteBuy(address token, uint256 amount) view returns (uint256 tokensOut, uint256 fee)",
+  "function quoteSell(address token, uint256 tokensIn) view returns (uint256 out, uint256 fee)",
+  "function price(address token) view returns (uint256)",
+  "function tokensOf(address city) view returns (address[])",
+  "function curves(address token) view returns (address city, uint256 reserve, uint256 tokens)",
+  "function releasable(address city) view returns (uint256 due, uint256 pending)",
+  "function release(address city) returns (uint256)",
+  "event TokenLaunched(address indexed city, address indexed token, address indexed creator, string name, string symbol)",
+  "event Traded(address indexed city, address indexed token, address indexed user, bool buy, uint256 ausd, uint256 tokens, uint256 fee)",
+]);
+
 export const apyFeedAbi = parseAbi([
   "function latest(bytes32 sourceId) view returns (uint32 apyBps, uint64 observedAt, uint64 updatedAt)",
   "function sourceLabel(bytes32 sourceId) view returns (string)",
@@ -60,6 +101,10 @@ export const apyFeedAbi = parseAbi([
 
 export const erc20Abi = parseAbi([
   "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
   "function nonces(address owner) view returns (uint256)",
   "function eip712Domain() view returns (bytes1 fields, string name, string version, uint256 chainId, address verifyingContract, bytes32 salt, uint256[] extensions)",
 ]);
@@ -75,4 +120,10 @@ export const guardianAbi = parseAbi([
   "event EvacuationRequested(address indexed city, address indexed adapter, address indexed requester, bytes32 planHash)",
   "event ProposalCreated(uint256 indexed id, address indexed city, address indexed proposer, address from, address to, uint256 amount, bytes32 planHash)",
   "event ProposalApproved(uint256 indexed id, address indexed city, bytes32 planHash)",
+]);
+
+export const marketplaceAbi = parseAbi([
+  "function hire(uint256 listingId, uint64 periods, bytes32 expectedTerms, address hook, bytes data) returns (uint64)",
+  "function hireWithPermit(uint256 listingId, uint64 periods, bytes32 expectedTerms, address hook, bytes data, uint256 deadline, uint8 v, bytes32 r, bytes32 s) returns (uint64)",
+  "function termsHash(uint256 listingId) view returns (bytes32)",
 ]);

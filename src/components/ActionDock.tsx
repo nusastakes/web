@@ -2,10 +2,10 @@
 
 import { APP } from "@/lib/copy-app";
 import { useLang } from "@/lib/lang";
-import { IconArrowDown, IconArrowUp, IconInfo, IconPlus, IconRecenter, IconSwap } from "./icons";
+import { IconArrowDown, IconArrowUp, IconInfo, IconPlus, IconRecenter, IconRules, IconStage, IconSwap } from "./icons";
 import { Card, cx } from "./ui";
 
-export type SheetKind = "deposit" | "withdraw" | "found" | "manage" | "explore" | null;
+export type SheetKind = "deposit" | "withdraw" | "found" | "manage" | "explore" | "panggung" | "rules" | null;
 
 interface Props {
   active: SheetKind;
@@ -16,9 +16,11 @@ interface Props {
   mayor?: boolean;
   /** Tombol yang disorot oleh panduan mulai. */
   highlight?: SheetKind;
+  /** True untuk kota sungguhan (bukan contoh): loket Panggung bisa dibuka pengunjung. */
+  services?: boolean;
 }
 
-export default function ActionDock({ active, onOpen, onRecenter, onDetails, mayor, highlight }: Props) {
+export default function ActionDock({ active, onOpen, onRecenter, onDetails, mayor, highlight, services }: Props) {
   const [lang] = useLang();
   const t = APP[lang].dock;
   /** `compact`: di layar sempit hanya ikon, kecuali saat aktif. */
@@ -33,7 +35,9 @@ export default function ActionDock({ active, onOpen, onRecenter, onDetails, mayo
       {item("deposit", <IconArrowDown />, t.deposit, true)}
       {item("withdraw", <IconArrowUp />, t.withdraw, true)}
       {item("found", <IconPlus />, t.found, true)}
+      {services && item("panggung", <IconStage />, t.panggung, true)}
       {mayor && item("manage", <IconSwap />, t.manage, true)}
+      {mayor && item("rules", <IconRules />, t.rules, true)}
       <span className="mx-1 hidden h-6 w-px bg-slate-900/10 sm:block" />
       <button onClick={onRecenter} aria-label={t.reset} className="hidden rounded-xl p-2.5 sm:block text-ink-soft hover:bg-white hover:text-ink"><IconRecenter /></button>
       <button onClick={onDetails} aria-label={t.details} className="rounded-xl p-2.5 text-ink-soft hover:bg-white hover:text-ink md:hidden"><IconInfo /></button>

@@ -9,6 +9,14 @@ export interface CityMap {
   bounds: [number, number, number, number];
   buildings: MapBuilding[];
   roads: MapRoad[];
+  /** Tutupan lahan dari data peta: t 0 = air, 1 = hijau (taman, hutan, rumput); p = [x0, z0, x1, z1, ...] cincin tertutup. Opsional. */
+  areas?: MapArea[];
+  /** True untuk lahan kosong prosedural yang dipakai saat data peta asli tidak bisa dimuat. */
+  fallback?: boolean;
+}
+export interface MapArea {
+  t: 0 | 1;
+  p: number[];
 }
 export interface MapBuilding {
   /** tinggi (m) */ h: number;

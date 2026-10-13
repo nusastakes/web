@@ -1,5 +1,7 @@
+import { loadCatalog, serviceBySource, CATEGORY_KIND } from "./catalog";
+import { parseOsmUri } from "./osm";
 import { createPublicClient, http } from "viem";
-import { adapterAbi, apyFeedAbi, erc20Abi, factoryAbi, vaultAbi } from "./abis";
+import { adapterAbi, apyFeedAbi, erc20Abi, factoryAbi, tunedAdapterAbi, vaultAbi } from "./abis";
 import { ADDR, RPC_URL, SOURCE_ID, monadTestnet } from "./config";
 import { ausdToNumber } from "./format";
 import type { CityView, District, Hex } from "./types";
@@ -14,10 +16,10 @@ const HIDDEN_CITY = /\(ignore\)/i;
 /** `?all=1` menampilkan juga kota uji (untuk debug). Hanya dibaca di klien, setelah mount. */
 const showAll = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("all");
 
-/** `preset:<id>` menunjuk peta bawaan; `osm:<lat>,<lon>` area asli dari OpenStreetMap (R24); lainnya peta bawaan. */
+/** `preset:<id>` menunjuk peta bawaan; `osm:<lat>,<lon>` atau `osm:<lat>,<lon>@<ukuran>` area asli dari OpenStreetMap (R24); lainnya peta bawaan. */
 export function mapIdFromUri(uri: string): string {
   if (uri.startsWith("preset:")) return uri.slice("preset:".length);
-  if (/^osm:-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(uri)) return uri;
+  if (parseOsmUri(uri)) return uri;
   return "scbd-jakarta";
 }
 
@@ -61,6 +63,8 @@ export async function loadCities(): Promise<CityView[]> {
       { address: a, abi: adapterAbi, functionName: "totalAssets" } as const,
       { address: a, abi: adapterAbi, functionName: "isSimulated" } as const,
       { address: a, abi: adapterAbi, functionName: "sourceId" } as const,
+      // Hanya adapter bersetelan yang punya `baseSourceId`; adapter lain gagal di sini, dan itu wajar.
+      { address: a, abi: tunedAdapterAbi, functionName: "baseSourceId" } as const,
     ]),
   ]);
   const res = await publicClient.multicall({ allowFailure: true, contracts: reads });
@@ -72,18 +76,20 @@ export async function loadCities(): Promise<CityView[]> {
       const total = res[cursor++];
       const sim = res[cursor++];
       const src = res[cursor++];
+      const base = res[cursor++];
       return {
         address: a as Hex,
         assets: total.status === "success" ? (total.result as bigint) : 0n,
         simulated: sim.status === "success" ? Boolean(sim.result) : false,
         sourceId: (src.status === "success" ? src.result : null) as Hex | null,
+        baseSourceId: (base.status === "success" ? base.result : null) as Hex | null,
       };
     });
     return { c, idle: idle.status === "success" ? (idle.result as bigint) : 0n, adapters };
   });
 
   const sourceIds = [...new Set(parsed.flatMap((p) => p.adapters.map((a) => a.sourceId).filter(Boolean) as Hex[]))];
-  const apys = await readApy(sourceIds.length ? sourceIds : [SOURCE_ID]);
+  const [apys, catalog] = await Promise.all([readApy(sourceIds.length ? sourceIds : [SOURCE_ID]), loadCatalog()]);
 
   return parsed
     .filter(({ c }) => showAll() || !HIDDEN_CITY.test(c.name))
@@ -93,7 +99,20 @@ export async function loadCities(): Promise<CityView[]> {
       const districts: District[] = [
         { id: "idle", kind: "idle", label: "Plaza", weight: sum === 0n ? 1 : w(idle), assets: ausdToNumber(idle), apyBps: null, simulated: false },
         ...adapters.map((a, i): District => {
+          // Adapter bersetelan memakai kunci feed miliknya sendiri (APY efektif dari setelan kota); layanannya dikenali
+          // lewat `baseSourceId`. Sebelum keeper menulis kunci itu, APY dasar katalog yang ditampilkan.
           const apy = a.sourceId ? apys.get(a.sourceId) : undefined;
+          const svc = serviceBySource(catalog, a.baseSourceId ?? a.sourceId);
+          const tuned = Boolean(a.baseSourceId);
+          const apyBps = tuned && !apy?.observedAt ? svc?.apyBps ?? null : apy?.apyBps ?? svc?.apyBps ?? null;
+          // Adapter cermin yang dikenal katalog menjadi layanan protokol (Bank, Brankas, Menara Staking, Pasar); lainnya seperti dulu.
+          if (svc && a.simulated) {
+            return {
+              id: a.address, kind: CATEGORY_KIND[svc.category], label: svc.name, protocol: svc.protocol,
+              weight: w(a.assets), assets: ausdToNumber(a.assets), apyBps, simulated: true, adapter: a.address,
+              serviceId: svc.id, category: svc.category, protocolTvlUsd: svc.tvlUsd, tunable: tuned,
+            };
+          }
           return {
             id: a.address,
             kind: a.simulated ? "lending" : "vault",
@@ -129,19 +148,22 @@ export interface Position {
   assets: bigint;
   ausd: bigint;
   maxDeposit: bigint;
+  /** Jumlah distrik dalam mode hanya-tarik (karantina). */
+  quarantined: number;
 }
 
 export async function readPosition(vault: Hex, owner: Hex): Promise<Position> {
-  const [shares, ausd, maxDeposit] = await publicClient.multicall({
+  const [shares, ausd, maxDeposit, quarantined] = await publicClient.multicall({
     allowFailure: false,
     contracts: [
       { address: vault, abi: vaultAbi, functionName: "balanceOf", args: [owner] },
       { address: ADDR.ausd, abi: erc20Abi, functionName: "balanceOf", args: [owner] },
       { address: vault, abi: vaultAbi, functionName: "maxDeposit", args: [owner] },
+      { address: vault, abi: vaultAbi, functionName: "quarantinedCount" },
     ],
   });
   const assets = shares > 0n ? await publicClient.readContract({ address: vault, abi: vaultAbi, functionName: "convertToAssets", args: [shares] }) : 0n;
-  return { shares, assets, ausd, maxDeposit };
+  return { shares, assets, ausd, maxDeposit, quarantined: Number(quarantined) };
 }
 
 /** Vault yang dipegang `owner` (saldo share > 0); dipakai untuk tahu apakah ia sudah pernah menyetor ke kota mana pun. */

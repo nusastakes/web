@@ -49,7 +49,7 @@ export default function WithdrawSheet({ city, onClose, onDone }: Props) {
     setError(null); setDone(false);
     setSteps(WITHDRAW_STEPS.map((s) => ({ ...s })));
     try {
-      await withdrawFlow({ wallet: w, vault: city.vault, owner: w.address, shares, cityName: city.name, report });
+      await withdrawFlow({ wallet: w, vault: city.vault, owner: w.address, shares, cityName: city.name, report, selfRedeem: (position?.quarantined ?? 0) > 0 });
       setDone(true);
       emitChange();
       await refresh();
@@ -86,6 +86,7 @@ export default function WithdrawSheet({ city, onClose, onDone }: Props) {
             <div className="text-[11px] text-ink-soft">{t.yours}</div>
             <div className="text-2xl font-semibold tracking-tight text-ink">{fmtAusd(Number(position.assets) / 1e6)} <span className="text-sm font-medium text-ink-soft">AUSD</span></div>
           </div>
+          {position.quarantined > 0 && <Notice tone="warn">{t.quarantined}</Notice>}
           <div className="flex gap-2">
             {[25, 50, 100].map((p) => (
               <button key={p} className={cx("btn flex-1 !py-1.5", pct === p ? "btn-primary" : "btn-ghost")} disabled={busy} onClick={() => setPct(p)}>{p === 100 ? t.all : `${p}%`}</button>

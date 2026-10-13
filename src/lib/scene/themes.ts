@@ -85,6 +85,9 @@ export interface CityStyle {
 
 export const DEFAULT_STYLE: CityStyle = { theme: "classic", works: ["banner", "fountain", "flowers"] };
 
+/** `?unlock=1` di alamat halaman: semua karya sipil terbuka (hanya tampilan, untuk memeriksa tanpa menunggu dana kota tumbuh). */
+export const unlockAllWorks = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("unlock");
+
 /** Dana (AUSD) kira-kira yang dibutuhkan untuk mencapai perkembangan `d`: kebalikan dari `developmentOf`. */
 export const fundsForDevelopment = (d: number) => Math.round(40 * (Math.exp(d * Math.log(1 + 60000 / 40)) - 1));
 

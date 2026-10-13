@@ -34,6 +34,7 @@ export default function DepositSheet({ city, onClose, onDone }: Props) {
   const parsed = useMemo(() => parseAusd(amount), [amount]);
   const balance = position?.ausd ?? 0n;
   const problem =
+    position && position.quarantined > 0 ? t.pErrQuarantine :
     parsed === null || parsed <= 0n ? t.pErrEnter :
     parsed < 10_000n ? t.pErrMin :
     position && parsed > balance ? t.pErrBal :

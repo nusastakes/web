@@ -1,7 +1,7 @@
 import { ADDR, RPC_URL, monadTestnet } from "./config";
-import { adapterAbi, erc20Abi, vaultAbi } from "./abis";
+import { adapterAbi, erc20Abi, marketplaceAbi, vaultAbi } from "./abis";
 import { publicClient } from "./chain";
-import { relayDeposit, relayWithdraw, splitSignature, type DepositResult, type WithdrawResult } from "./relayer";
+import { relayDeposit, relayWithdraw, requestGas, splitSignature, type DepositResult, type HireVia, type WithdrawResult } from "./relayer";
 import type { Hex } from "./types";
 import type { WalletApi } from "./wallet";
 
@@ -56,8 +56,20 @@ export async function depositFlow(args: { wallet: WalletApi; vault: Hex; owner: 
 }
 
 /** Tarik: uang keluar, jadi selalu ceremony passkey baru. Permit atas share kota; aset hanya dibayar ke pemilik. */
-export async function withdrawFlow(args: { wallet: WalletApi; vault: Hex; owner: Hex; shares: bigint; cityName: string; report: Report }): Promise<WithdrawResult> {
+export async function withdrawFlow(args: { wallet: WalletApi; vault: Hex; owner: Hex; shares: bigint; cityName: string; report: Report; selfRedeem?: boolean }): Promise<WithdrawResult> {
   const { wallet, vault, owner, shares, cityName, report } = args;
+  if (args.selfRedeem) {
+    // Selama karantina kontrak hanya mengizinkan pemegang menarik sendiri dari akunnya (`QuarantineExitsAreSelfOnly`):
+    // relayer tidak bisa mengirimkannya, jadi akun membayar gas sendiri. Gas uji diminta dari relayer bila kurang.
+    if ((await publicClient.getBalance({ address: owner })) < 30_000_000_000_000_000n) {
+      report("sign", { state: "active", detail: "Getting a little test gas" });
+      const drip = await requestGas(owner);
+      await publicClient.waitForTransactionReceipt({ hash: drip.hash });
+    }
+    report("send", { label: "Sent to Monad" });
+    const { hash } = await contractTx(wallet, { address: vault, abi: vaultAbi, functionName: "redeem", args: [shares, owner, owner] }, { ceremony: true, label: "Confirm the withdrawal with your passkey…", report });
+    return { hash, status: "success" };
+  }
   report("sign", { state: "active", detail: "Confirm with your passkey" });
   const nonce = await publicClient.readContract({ address: vault, abi: vaultAbi, functionName: "nonces", args: [owner] });
   const deadline = nowSec() + 600n;
@@ -93,7 +105,7 @@ export const WITHDRAW_STEPS: Step[] = [
 // jadi pakai 1,5 x base fee + tip, bukan 2x bawaan viem (lihat TC54).
 // ---------------------------------------------------------------------------------------------------------------
 
-import { encodeFunctionData, keccak256, parseEventLogs, toHex, zeroAddress } from "viem";
+import { encodeFunctionData, keccak256, parseEventLogs, toHex, zeroAddress, type LocalAccount } from "viem";
 import { factoryAbi } from "./abis";
 
 async function feeCaps() {
@@ -103,14 +115,18 @@ async function feeCaps() {
   return { maxFeePerGas: (block.baseFeePerGas * 3n) / 2n + tip, maxPriorityFeePerGas: tip };
 }
 
-export interface FoundCityInput { name: string; community: string; feeBps: number; mapId: string }
+export interface FoundCityInput { name: string; community: string; feeBps: number; mapId: string; /** Implementasi adapter (layanan protokol) yang dipilih walikota; bawaan: satu adapter cermin. */ adapterImpls?: Hex[] }
 
 /** Mendirikan kota. Pengirim menjadi walikota. Mengembalikan hash dan alamat vault. */
 export async function foundCityFlow(args: { wallet: WalletApi; owner: Hex; input: FoundCityInput; report: Report }): Promise<{ hash: Hex; vault?: Hex }> {
+  // Factory yang dideploy ulang punya adapter sendiri; alamat lama membuat pembuatan kota gagal dengan galat yang tidak jelas.
   const { wallet, owner, input, report } = args;
+  const impls = input.adapterImpls?.length ? input.adapterImpls : [ADDR.mirrorAdapterImpl];
+  const allowedList = await Promise.all(impls.map((impl) => publicClient.readContract({ address: ADDR.factory, abi: factoryAbi, functionName: "allowedAdapterImpl", args: [impl] }).catch(() => true)));
+  if (allowedList.some((ok) => !ok)) throw new Error("The city factory was updated and this page still has an old service address. Reload the page; if it keeps happening, tell the team.");
   report("sign", { state: "active" });
   const mapURI = input.mapId.startsWith("osm:") ? input.mapId : `preset:${input.mapId}`;
-  const callArgs = [input.name.trim(), input.community.trim(), input.feeBps, [ADDR.mirrorAdapterImpl], mapURI] as const;
+  const callArgs = [input.name.trim(), input.community.trim(), input.feeBps, impls, mapURI] as const;
   const [estimate, fees] = await Promise.all([
     publicClient.estimateContractGas({ address: ADDR.factory, abi: factoryAbi, functionName: "createCity", args: callArgs, account: owner }),
     feeCaps(),
@@ -140,8 +156,8 @@ export const FOUND_STEPS: Step[] = [
 ];
 
 /** Saldo MON minimum untuk mendirikan kota: gas limit (estimasi + 10%) x maxFeePerGas. Monad menolak bila saldo kurang. */
-export async function estimateFoundCost(owner: Hex): Promise<bigint> {
-  const args = ["Cost probe", "", 0, [ADDR.mirrorAdapterImpl], "preset:scbd-jakarta"] as const;
+export async function estimateFoundCost(owner: Hex, adapterImpls?: Hex[]): Promise<bigint> {
+  const args = ["Cost probe", "", 0, adapterImpls?.length ? adapterImpls : [ADDR.mirrorAdapterImpl], "preset:scbd-jakarta"] as const;
   const [estimate, fees] = await Promise.all([
     publicClient.estimateContractGas({ address: ADDR.factory, abi: factoryAbi, functionName: "createCity", args, account: owner }),
     feeCaps(),
@@ -159,12 +175,13 @@ export interface MayorState {
   slots: Slot[];
   total: bigint;
   maxShiftBps: number;
-  deputy: { address: Hex; expiry: number; maxShiftBps: number } | null;
+  /** `budgetLeft` dan `budgetTotal`: batas pergeseran kunci wakil per jam (kontrak v3), dalam unit mentah AUSD. */
+  deputy: { address: Hex; expiry: number; maxShiftBps: number; budgetLeft: bigint; budgetTotal: bigint } | null;
 }
 
 /** Keadaan vault yang dibutuhkan walikota, dibaca langsung dari chain (angka mentah, bukan hasil bulat). */
 export async function readMayorState(vault: Hex, labels: Map<string, string>): Promise<MayorState> {
-  const [adapters, maxShiftBps, key, expiry, keyShift, idle] = await publicClient.multicall({
+  const [adapters, maxShiftBps, key, expiry, keyShift, idle, budgetBps, windowStart, windowShifted, totalAssets] = await publicClient.multicall({
     allowFailure: false,
     contracts: [
       { address: vault, abi: vaultAbi, functionName: "adapters" },
@@ -173,6 +190,10 @@ export async function readMayorState(vault: Hex, labels: Map<string, string>): P
       { address: vault, abi: vaultAbi, functionName: "sessionKeyExpiry" },
       { address: vault, abi: vaultAbi, functionName: "sessionKeyMaxShiftBps" },
       { address: ADDR.ausd, abi: erc20Abi, functionName: "balanceOf", args: [vault] },
+      { address: vault, abi: vaultAbi, functionName: "sessionBudgetBps" },
+      { address: vault, abi: vaultAbi, functionName: "sessionWindowStart" },
+      { address: vault, abi: vaultAbi, functionName: "sessionWindowShifted" },
+      { address: vault, abi: vaultAbi, functionName: "totalAssets" },
     ],
   });
   const held = await publicClient.multicall({
@@ -185,9 +206,13 @@ export async function readMayorState(vault: Hex, labels: Map<string, string>): P
   ];
   const total = slots.reduce((s, x) => s + x.assets, 0n);
   const active = key !== zeroAddress && Number(expiry) > nowSec();
+  // Anggaran kunci wakil: sebagian dari total aset per jam; jendela yang sudah lewat satu jam dihitung kosong.
+  const budgetTotal = (totalAssets * BigInt(budgetBps)) / 10_000n;
+  const windowOpen = nowSec() < BigInt(windowStart) + 3600n;
+  const used = windowOpen ? windowShifted : 0n;
   return {
     slots, total, maxShiftBps,
-    deputy: active ? { address: key as Hex, expiry: Number(expiry), maxShiftBps: keyShift } : null,
+    deputy: active ? { address: key as Hex, expiry: Number(expiry), maxShiftBps: keyShift, budgetTotal, budgetLeft: used >= budgetTotal ? 0n : budgetTotal - used } : null,
   };
 }
 
@@ -277,26 +302,29 @@ export const DEPUTY_STEPS: Step[] = [
 
 export interface ContractCall { address: Hex; abi: readonly unknown[]; functionName: string; args: readonly unknown[] }
 
-export async function contractTx(wallet: WalletApi, call: ContractCall, opts: { ceremony: boolean; label: string; report?: Report }): Promise<{ hash: Hex }> {
+export async function contractTx(wallet: WalletApi, call: ContractCall | ((account: LocalAccount) => Promise<ContractCall>), opts: { ceremony: boolean; label: string; report?: Report }): Promise<{ hash: Hex }> {
   const { report } = opts;
   report?.("sign", { state: "active", detail: opts.ceremony ? "Confirm with your passkey" : undefined });
-  const data = (encodeFunctionData as (p: { abi: readonly unknown[]; functionName: string; args: readonly unknown[] }) => Hex)({ abi: call.abi, functionName: call.functionName, args: call.args });
-  const build = async (from: Hex) => {
+  // `call` boleh berupa fungsi yang dijalankan di dalam ceremony, mis. bila transaksi memuat tanda tangan permit.
+  const build = async (from: Hex, c: ContractCall) => {
+    const data = (encodeFunctionData as (p: { abi: readonly unknown[]; functionName: string; args: readonly unknown[] }) => Hex)({ abi: c.abi, functionName: c.functionName, args: c.args });
     const [estimate, fees] = await Promise.all([
-      publicClient.estimateGas({ account: from, to: call.address, data }),
+      publicClient.estimateGas({ account: from, to: c.address, data }),
       feeCaps(),
     ]);
-    return { to: call.address, data, gas: (estimate * 125n) / 100n, ...fees };
+    return { to: c.address, data, gas: (estimate * 125n) / 100n, ...fees };
   };
   let hash: Hex;
   if (opts.ceremony) {
     hash = await wallet.withCeremony(opts.label, async (account) => {
+      const c = typeof call === "function" ? await call(account) : call;
       const { createWalletClient, http } = await import("viem");
-      return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction((await build(account.address)) as never);
+      return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction((await build(account.address, c)) as never);
     });
   } else {
+    if (typeof call === "function") throw new Error("This action needs a fresh passkey confirmation.");
     if (!wallet.address) throw new Error("Sign in first.");
-    hash = await wallet.sendTransaction(await build(wallet.address));
+    hash = await wallet.sendTransaction(await build(wallet.address, call));
   }
   report?.("sign", { state: "done", detail: undefined });
   report?.("send", { state: "done", hash });
@@ -305,6 +333,40 @@ export async function contractTx(wallet: WalletApi, call: ContractCall, opts: { 
   if (receipt.status !== "success") throw new Error("The transaction was reverted.");
   report?.("confirm", { state: "done" });
   return { hash };
+}
+
+/**
+ * Menyewa staf lewat AgentMarketplace (kontrak v3 revisi 3): satu ceremony menandatangani permit AUSD sebesar harga
+ * lalu mengirim `hireWithPermit`; harga langsung ke dompet agen. `expectedTerms` adalah sidik jari syarat yang tampil
+ * di layar (harga, periode, kapabilitas, token, penjual, dompet); syarat dibaca ulang dari kontrak tepat sebelum
+ * mengirim, dan kontrak menolak (`TermsChanged`) bila penjual mengubahnya. Listing gratis memakai `hire` tanpa permit.
+ */
+export async function hireFlow(args: { wallet: WalletApi; owner: Hex; offer: HireVia; name: string; report?: Report }): Promise<{ hash: Hex }> {
+  const { wallet, owner, offer, name, report } = args;
+  const price = BigInt(offer.price);
+  if (price > 0n) {
+    const balance = await publicClient.readContract({ address: offer.asset, abi: erc20Abi, functionName: "balanceOf", args: [owner] });
+    if (balance < price) throw new Error(`You need ${(Number(price) / 1e6).toFixed(2)} AUSD to hire ${name}, and you have ${(Number(balance) / 1e6).toFixed(2)}. Get test AUSD from the Deposit screen first.`);
+  }
+  const common = [BigInt(offer.listingId), BigInt(offer.periods), offer.expectedTerms, offer.hook, offer.data] as const;
+  return contractTx(wallet, async (account) => {
+    const live = await publicClient.readContract({ address: ADDR.marketplace, abi: marketplaceAbi, functionName: "termsHash", args: [BigInt(offer.listingId)] });
+    if (live.toLowerCase() !== offer.expectedTerms.toLowerCase()) throw new Error("TermsChanged: the listing changed after you opened this screen.");
+    if (price === 0n) return { address: ADDR.marketplace, abi: marketplaceAbi, functionName: "hire", args: common };
+    const [domain, nonce] = await Promise.all([
+      readAusdDomain(),
+      publicClient.readContract({ address: offer.asset, abi: erc20Abi, functionName: "nonces", args: [owner] }),
+    ]);
+    const deadline = nowSec() + 600n;
+    const sig = await account.signTypedData({
+      domain: { name: domain.name, version: domain.version, chainId: monadTestnet.id, verifyingContract: offer.asset },
+      types: PERMIT_TYPES,
+      primaryType: "Permit",
+      message: { owner, spender: ADDR.marketplace, value: price, nonce, deadline },
+    });
+    const { v, r, s } = splitSignature(sig);
+    return { address: ADDR.marketplace, abi: marketplaceAbi, functionName: "hireWithPermit", args: [...common, deadline, v, r, s] };
+  }, { ceremony: true, label: `Confirm hiring ${name} with your passkey…`, report });
 }
 
 export const TX_STEPS = (label: string): Step[] => [

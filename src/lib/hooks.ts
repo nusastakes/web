@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { readMayorState, type MayorState } from "./actions";
+import { useAddressesReady } from "./addresses";
 import { loadCities, readAusdBalance, readHeldVaults, readMonBalance, readPosition, type Position } from "./chain";
 import type { CityView, Hex } from "./types";
 
@@ -19,7 +20,9 @@ export function emitChange() {
 }
 
 /** Memanggil `fn` sekarang lalu tiap `ms`, dan menyediakan `refresh` untuk dipanggil setelah aksi. */
-function usePolled<T>(fn: () => Promise<T>, ms: number, enabled = true) {
+function usePolled<T>(fn: () => Promise<T>, ms: number, wanted = true) {
+  const ready = useAddressesReady();
+  const enabled = wanted && ready;
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -46,7 +49,7 @@ function usePolled<T>(fn: () => Promise<T>, ms: number, enabled = true) {
   }, [enabled, ms, refresh]);
 
   // Bila dinonaktifkan, data lama tidak ditampilkan (turunan, bukan setState di dalam efek).
-  return { data: enabled ? data : undefined, error, loading: enabled ? loading : false, refresh };
+  return { data: enabled ? data : undefined, error, loading: wanted ? (ready ? loading : true) : false, refresh };
 }
 
 export function useCities() {

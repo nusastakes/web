@@ -13,7 +13,7 @@ dan selalu diberi label "simulated" di layar.
 |---|---|
 | `/` | Halaman depan: kota 3D hidup di latar, angka platform langsung, cara kerja, kota teratas |
 | `/signin` | Buat akun atau masuk lagi dengan passkey, daftar perangkat yang didukung; `?next=` menentukan tujuan setelah masuk |
-| `/city` | Aplikasi kota; `?demo=1` memutar demo 80 detik, `?all=1` menampilkan kota uji |
+| `/city` | Aplikasi kota; `?c=<alamat vault>` membuka kota tertentu, `?demo=1` memutar demo 80 detik, `?all=1` menampilkan kota uji |
 
 ## Fitur
 
@@ -21,10 +21,12 @@ dan selalu diberi label "simulated" di layar.
 |---|---|---|
 | Akun passkey (Mera) | Satu prompt untuk membuat akun; masuk lagi tanpa state lokal; sesi terkunci otomatis setelah 10 menit diam; tarik dana selalu meminta passkey baru | `src/lib/wallet.tsx` |
 | Setor dan tarik | Penduduk hanya menandatangani `permit`; relayer mengirim transaksi dan membayar gas | `src/lib/actions.ts`, `src/lib/relayer.ts` |
-| Dirikan kota | Walikota memilih nama, komunitas, peta, dan fee (maksimal 20%) | `src/components/sheets/FoundCitySheet.tsx` |
+| Dirikan kota | Walikota memilih nama, komunitas, fee (maksimal 20%), dan area: peta bawaan atau area sembarang yang dipilih di peta OpenStreetMap (Leaflet; kotak 360, 520, atau 800 m); bangunan dan jalan diambil dari OpenStreetMap, dengan lahan kosong prosedural bila data gagal dimuat | `src/components/sheets/FoundCitySheet.tsx`, `AreaPickerModal.tsx`, `src/lib/osm.ts` |
+| Layanan protokol | Tiap distrik kota adalah cermin satu protokol Monad (Bank, Brankas, Menara Staking, Pasar) dengan APY dan TVL mainnet langsung dari katalog relayer (`GET /catalog`, sumber DefiLlama) dan dana simulasi di testnet; walikota memilih 1 sampai 6 layanan saat mendirikan kota; landmark 3D per jenis | `src/lib/catalog.ts`, `ServicePicker.tsx`, `src/lib/scene/services3d.ts` |
+| Meja Walikota | Untuk walikota awam: tahap kota dan kemajuannya, langkah berikutnya yang bisa diketuk, kesehatan dana dalam bahasa sehari-hari, tiga strategi cepat satu ketukan, saran dari aturan sederhana (bukan AI), glosarium; kartu ringkas di layar utama | `src/components/sheets/MayorDesk.tsx`, `MayorStrip.tsx`, `src/lib/coach.ts` |
 | Balai kota (walikota) | Pindah dana antar distrik dalam batas kontrak, kunci wakil untuk kerja harian tanpa prompt, buku strategi tersegel, staf AI, desain kota | `src/components/sheets/ManageSheet.tsx` dan panel di sebelahnya |
 | Buku strategi tersegel | Alasan walikota dienkripsi di perangkat dengan kunci dari passkey; hanya hash ciphertext yang tercatat onchain; satu entri bisa dibuka publik di akhir musim | `src/lib/book.ts`, `BookPanel.tsx` |
-| Staf AI | Sewa dan cabut Satpam (workflow Chainlink CRE), Analis (usulan yang disetujui satu ketukan), dan Humas (laporan mingguan) | `StaffPanel.tsx` |
+| Staf AI | Sewa dan cabut Satpam (workflow Chainlink CRE, izin langsung), Analis (usulan yang disetujui satu ketukan), Humas (laporan mingguan), dan agen komunitas; staf berbayar disewa lewat marketplace onchain (satu passkey: permit AUSD lalu `hireWithPermit`) | `StaffPanel.tsx`, `lib/actions.ts` |
 | Kota 3D | Bangunan dan jalan asli (Overture/OSM), tumbuh dari tanah kosong mengikuti dana; siang-malam, hujan, lalu lintas, bus, ojek, pedagang, pasar malam; gedung bisa dibelah untuk melihat isinya | `src/lib/scene/` |
 | Kejadian onchain | `Deposit`, `Withdraw`, `Rebalanced`, `FeeAccrued`, `Evacuated`, usulan Analis, kunci wakil, fee, reveal, sewa staf menjadi truk, kerumunan, rapat, dan alarm di kota | `src/lib/activity.ts` |
 
@@ -53,6 +55,8 @@ npm run build && npm run start
 npm run lint
 ```
 
+Alamat kontrak dibaca dari `GET /config` relayer saat halaman dibuka (`src/lib/addresses.ts`); `src/lib/deployment.json` hanya cadangan bila relayer tidak terjangkau.
+
 Variabel lingkungan (opsional, di `.env.local`):
 
 | Variabel | Bawaan |
@@ -79,12 +83,14 @@ Passkey terikat ke domain (rpId). Akun yang dibuat di `localhost` tidak bisa dip
   - dirikan kota, tata ulang dengan passkey dan dengan kunci wakil
   - gaya kota tersimpan bersama lewat relayer
   - alasan tersegel di buku strategi, buku dibuka (juga setelah penyimpanan dihapus), dan reveal onchain
-  - sewa Analis, minta usulan, setujui satu ketukan
+  - pilih area di peta, bangun kota dari area itu (Braga 800 m: 1.408 bangunan), dan lahan kosong cadangan saat data gagal
+  - sewa Analis lewat marketplace, minta usulan, setujui satu ketukan; sewa Satpam dan agen komunitas
 - Logika kota (rute, lampu lalu lintas, jadwal harian) diuji dengan simulasi satu hari penuh tanpa layar: tanpa kendaraan
   macet permanen dan tanpa angka tidak valid.
 - `tsc --noEmit`, `eslint`, dan `next build` lulus.
 
 **Belum diuji:**
+- Jalur karantina (setor dijeda, penarikan mandiri): butuh adapter yang rusak.
 - Passkey Mera di perangkat sungguhan dan uji lintas perangkat buku strategi. Authenticator virtual Chrome tidak membawa
   rahasia PRF ke profil lain.
 - Gerakan kota 3D di GPU sungguhan dan performa di ponsel. Ada mode hemat untuk layar di bawah 820 px.
@@ -92,7 +98,9 @@ Passkey terikat ke domain (rpId). Akun yang dibuat di `localhost` tidak bisa dip
 ## Data peta
 
 `public/maps/` berisi cuplikan bangunan dan jalan dari Overture Maps (rilis `2026-09-23.1`) untuk SCBD Jakarta dan
-Malioboro Yogyakarta, diambil sekali; frontend tidak memanggil Overture saat runtime.
+Malioboro Yogyakarta, diambil sekali; frontend tidak memanggil Overture saat runtime. Area lain yang dipilih walikota
+diambil dari OpenStreetMap (Overpass API) di browser; `mapURI` kota (`osm:<lat>,<lon>[@<ukuran>]`) memungkinkan siapa pun
+membangun ulang peta yang sama. Ubin peta di pemilih area: OpenStreetMap.
 
 Atribusi wajib: **© OpenStreetMap contributors, Overture Maps Foundation**. Sebagian bangunan berasal dari Google
 Open Buildings (CC BY 4.0) dan Microsoft ML Buildings (ODbL). Nama toko dan gedung di kota adalah fiktif.

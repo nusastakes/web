@@ -13,7 +13,9 @@ import { buildBuildingsGeometry, footprintOf, hash01, styleOf, type CityMap } fr
 import { BuildingInterior, type AgendaItem, type BuildingKind, type InteriorInfo } from "./interior";
 import { Construction, type CraneSite } from "./construction";
 import { CityFabric } from "./fabric";
+import { LandCover } from "./landcover";
 import { CityCivic } from "./civic";
+import { ServiceLandmarks } from "./services3d";
 import { CityClock } from "./clock";
 import { Landmarks } from "./landmarks";
 import { CityLife, type CityStats, type Floater, type Inspect, type LifeEvent } from "./life";
@@ -86,9 +88,11 @@ export class CityScene {
   private districtMeshes: DistrictMesh[] = [];
   private life: CityLife | null = null;
   private fabric: CityFabric | null = null;
+  private landcover: LandCover | null = null;
   private construction: Construction | null = null;
   private scenery: Scenery | null = null;
   private civic: CityCivic | null = null;
+  private serviceLandmarks: ServiceLandmarks | null = null;
   private style: CityStyle = { ...DEFAULT_STYLE, works: [...DEFAULT_STYLE.works] };
   private hall: { x: number; z: number; h: number } | null = null;
   private civicKey = "";
@@ -278,10 +282,13 @@ export class CityScene {
     this.districtMeshes = [];
     this.life = null;
     this.fabric = null;
+    this.landcover = null;
     this.construction = null;
     this.scenery?.dispose();
     this.scenery = null;
     this.civic = null;
+    this.serviceLandmarks?.dispose();
+    this.serviceLandmarks = null;
     this.landmarks = null;
     this.interior?.dispose();
     this.interior = null;
@@ -303,6 +310,7 @@ export class CityScene {
     // Penata kota: jalan bertingkat, trotoar, marka, zebra, lampu, pohon, taman. Semuanya tumbuh bersama perkembangan kota.
     this.graph = new RoadGraph(map.roads);
     this.fabric = new CityFabric(this.cityGroup, map, this.graph);
+    this.landcover = new LandCover(this.cityGroup, map);
     this.construction = new Construction(this.cityGroup);
     // Kehidupan kota (kendaraan, pejalan kaki, logistik, acara) memakai graf jalan yang sama.
     this.life = new CityLife(this.cityGroup, map, this.graph);
@@ -311,6 +319,7 @@ export class CityScene {
     this.life.setParks(this.fabric.parkSpots);
     this.civic = new CityCivic(this.cityGroup, map, (ev) => this.life?.emit(ev));
     this.landmarks = new Landmarks(this.cityGroup, map);
+    this.serviceLandmarks = new ServiceLandmarks(this.cityGroup);
     this.applyStyle();
     this.devState.clear();
     this.cityDev = 0;
@@ -398,6 +407,11 @@ export class CityScene {
       return { id: d.id, kind: d.kind, color: DISTRICT_COLORS[d.kind], weight: d.weight, x, z, roofs };
     });
     this.life.setDistricts(list);
+    // Landmark per layanan protokol, di tempat kosong dekat pusat tiap distrik (TC67).
+    if (this.fabric) {
+      const fab = this.fabric;
+      this.serviceLandmarks?.setAnchors(list.map((q) => ({ id: q.id, kind: q.kind, color: q.color, x: q.x, z: q.z })), (x, z, m) => fab.placeable(x, z, m));
+    }
     // Karya sipil dipasang di sekitar alun-alun, di taman yang ditemukan penata kota.
     const plaza = this.life.focusPoint("idle") ?? this.life.focusPoint(districts[0]?.id ?? "");
     if (plaza && this.civic && this.fabric) {
@@ -423,6 +437,7 @@ export class CityScene {
     const theme = THEMES[this.style.theme] ?? THEMES.classic;
     this.scenery?.setTheme(theme);
     this.fabric?.setTheme(theme);
+    this.landcover?.setTheme(theme);
     this.civic?.setStyle(this.style);
   }
 
@@ -552,6 +567,7 @@ export class CityScene {
     this.shared.uTime.value = this.timer.getElapsed();
     if (this.scenery) { this.shared.uSkyTop.value.copy(this.scenery.skyTop); this.shared.uSkyBot.value.copy(this.scenery.skyBottom); }
     this.fabric?.setNight(night, this.rain);
+    this.landcover?.setNight(night, this.rain);
     this.life?.setNight(Math.max(night, this.rain * 0.6));
     this.life?.setRain(this.rain);
     // Glow hanya malam, dan hanya untuk cahaya yang lebih terang dari putih (jendela, lampu, layar).
@@ -1030,6 +1046,8 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     this.scenery?.update(this.timer.getElapsed(), this.camera);
     this.civic?.setDevelopment(this.cityDev);
     this.civic?.update(dt);
+    // Landmark layanan muncul menurut dana distrik (target), bukan menunggu animasi pembangunan gedung selesai.
+    this.serviceLandmarks?.update(dt, (id) => this.districtMeshes.find((m) => m.id === id)?.target ?? 0);
     this.clock.update(dt);
     this.applyTime(dt);
     this.controls.update();

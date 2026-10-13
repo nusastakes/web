@@ -25,6 +25,9 @@ export const ADDR = {
   apyFeed: deployment.contracts.ApyFeed as Hex,
   reserve: deployment.contracts.YieldReserve as Hex,
   mirrorAdapterImpl: deployment.contracts.MirrorYieldAdapter as Hex,
+  marketplace: deployment.contracts.AgentMarketplace as Hex,
+  /** Loket kota untuk pengguna luar (Panggung; prediksi dikunci di kontrak). */
+  cityServices: deployment.contracts.CityServices as Hex,
 };
 
 export const AUSD_DECIMALS = deployment.asset.decimals;

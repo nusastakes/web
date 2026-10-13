@@ -4,9 +4,11 @@ import { useState } from "react";
 import { writeEntry } from "@/lib/book";
 import BookPanel from "./BookPanel";
 import StaffPanel from "./StaffPanel";
-import { DEFAULT_STYLE, THEMES, THEME_IDS, WORKS, developmentOf, fundsForDevelopment, type CityStyle, type WorkId } from "@/lib/scene/themes";
+import { DEFAULT_STYLE, THEMES, THEME_IDS, WORKS, developmentOf, encodeStyle, fundsForDevelopment, unlockAllWorks, type CityStyle, type WorkId } from "@/lib/scene/themes";
 import { REBALANCE_STEPS, DEPUTY_STEPS, TX_STEPS, contractTx, planHashOf, rebalanceFlow, setDeputyFlow, type Slot, type Step } from "@/lib/actions";
+import { planPreset, type PlanSlot, type PresetId } from "@/lib/coach";
 import { vaultAbi } from "@/lib/abis";
+import { DESK } from "@/lib/copy-desk";
 import { MAYOR } from "@/lib/copy-mayor";
 import { humanError } from "@/lib/errors";
 import { fmtAusd, fmtBps } from "@/lib/format";
@@ -18,6 +20,7 @@ import { useWallet } from "@/lib/wallet";
 import { IconKey, IconSwap } from "../icons";
 import StepList from "../StepList";
 import { Badge, Field, Notice, Sheet, Spinner, inputCls } from "../ui";
+import MayorDesk from "./MayorDesk";
 import NeedAccount from "./NeedAccount";
 
 interface Props {
@@ -30,7 +33,15 @@ interface Props {
   onStyle?: (s: CityStyle) => void;
   styleSync?: "local" | "loading" | "shared" | "saving" | "error";
   styleError?: string;
+  /** Tab yang dibuka lebih dulu (bawaan: Ringkasan / Meja Walikota). */
+  initialTab?: Tab;
+  /** Membuka lembar setor (dari langkah "Setor modal pertama"). */
+  onDeposit?: () => void;
+  /** Membuka lembar dirikan kota (saran "dirikan kota baru dengan beberapa layanan"). */
+  onFound?: () => void;
 }
+
+type Tab = "desk" | "funds" | "book" | "staff" | "design";
 
 const DEPUTY_TTL = 24 * 3600;
 const DEPUTY_SHIFT_BPS = 2500;
@@ -38,10 +49,11 @@ const DEPUTY_SHIFT_BPS = 2500;
 const LOW_GAS = 200_000_000_000_000_000n;
 const ausd = (raw: bigint) => fmtAusd(Number(raw) / 1e6);
 
-export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STYLE, styleCode = "", onStyle, styleSync = "local", styleError }: Props) {
+export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STYLE, styleCode = "", onStyle, styleSync = "local", styleError, initialTab = "desk", onDeposit, onFound }: Props) {
   const w = useWallet();
   const [lang] = useLang();
   const t = MAYOR[lang].manage;
+  const d = DESK[lang];
   // Nama distrik bawaan ikut bahasa; yang tersimpan di buku strategi tetap label aslinya.
   const slotName = (label: string) => (lang === "id" ? ({ Plaza: "Alun-alun", "Lending district": "Distrik pinjaman", "Vault district": "Distrik brankas" } as Record<string, string>)[label] ?? label : label);
   const ready = w.status === "ready" && !!w.address;
@@ -61,7 +73,10 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const [feeDraft, setFeeDraft] = useState<number | null>(null);
   const [shiftDraft, setShiftDraft] = useState<number | null>(null);
   const [ruleSteps, setRuleSteps] = useState<Step[] | null>(null);
-  const [tab, setTab] = useState<"funds" | "book" | "staff" | "design">("funds");
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const [presetSteps, setPresetSteps] = useState<Step[] | null>(null);
+  const [presetNote, setPresetNote] = useState<{ tone: "good" | "info"; text: string } | null>(null);
 
   const deputyActive = !!state?.deputy && !!w.deputy && state.deputy.address.toLowerCase() === w.deputy.toLowerCase();
   const signer = deputyActive ? w.deputy : w.address;
@@ -120,6 +135,40 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
     } catch (e) { setError(humanError(e)); failActive(setDeputySteps); }
   };
 
+  /**
+   * Strategi cepat (Meja Walikota): menggeser dana antara Alun-alun dan distrik supaya porsi yang bekerja mendekati `pct`.
+   * Satu perubahan dibatasi aturan kota (`limitBps`); bila belum sampai, walikota mengetuk lagi.
+   */
+  const applyPreset = async (preset: PresetId, pct: number) => {
+    if (!w.address || !city.vault || !state) return;
+    setError(null); setPresetNote(null);
+    const cat = new Map(city.districts.map((x) => [x.id, x.category]));
+    const planSlots: PlanSlot[] = state.slots.map((x) => ({ id: x.id, address: x.address, assets: x.assets, idle: x.id === "idle", category: cat.get(x.id) }));
+    const moves = planPreset(planSlots, pct, preset, limitBps);
+    if (moves.length === 0) { setPresetNote({ tone: "info", text: t.pAmount }); return; }
+    setPresetBusy(true);
+    setPresetSteps(REBALANCE_STEPS.map((x) => ({ ...x })));
+    const report = (id: string, patch: Partial<Step>) => setPresetSteps((p) => (p ?? REBALANCE_STEPS).map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    let done = 0; let moved = 0n;
+    try {
+      for (const m of moves) {
+        setPresetSteps(REBALANCE_STEPS.map((x) => ({ ...x })));
+        await rebalanceFlow({ wallet: w, useDeputy: deputyActive, report, input: { vault: city.vault, owner: w.address, from: m.from.address as Hex, to: m.to.address as Hex, amount: m.amount, planHash: planHashOf("") } });
+        done++; moved += m.amount;
+      }
+      setPresetNote({ tone: "good", text: d.presetDone(done, ausd(moved)) });
+    } catch (e) {
+      setError(humanError(e));
+      setPresetSteps((p) => p?.map((x) => (x.state === "active" ? { ...x, state: "error" } : x)) ?? null);
+      if (done > 0) setPresetNote({ tone: "info", text: `${d.presetDone(done, ausd(moved))} ${d.presetPartial(moves.length - done)}` });
+    } finally {
+      emitChange();
+      await Promise.all([refresh(), refreshBalances()]).catch(() => undefined);
+      onDone();
+      setPresetBusy(false);
+    }
+  };
+
   /** Ubah aturan kota (fee, batas pergeseran): ceremony passkey baru dengan kunci utama (PRD B16). */
   const saveRule = async (kind: "fee" | "shift") => {
     if (!city.vault) return;
@@ -155,13 +204,25 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
         : (
           <div className="space-y-4">
             <div className="flex gap-1 rounded-xl bg-slate-900/5 p-1" role="tablist">
-              {(["funds", "book", "staff", "design"] as const).map((k) => (
+              {(["desk", "funds", "book", "staff", "design"] as const).map((k) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold ${tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>
-                  {t.tabs[k]}
+                  className={`flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-semibold sm:text-xs ${tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>
+                  {k === "desk" ? d.tab : t.tabs[k]}
                 </button>
               ))}
             </div>
+            {tab === "desk" && lowGas && (
+              <Notice tone="info">
+                <div className="flex items-center justify-between gap-3">
+                  <span>{t.lowGas(deputyActive, (Number(balances!.mon) / 1e18).toFixed(2))}</span>
+                  <button className="btn btn-primary !px-3 !py-1.5 text-xs" onClick={getGas} disabled={gasBusy}>{gasBusy ? <Spinner /> : null} {t.getGas}</button>
+                </div>
+              </Notice>
+            )}
+            {tab === "desk" && (
+              <MayorDesk city={city} state={state} owner={w.address!} styleChanged={encodeStyle(style) !== encodeStyle(DEFAULT_STYLE)} go={setTab}
+                openDeposit={() => onDeposit?.()} openFound={() => onFound?.()} applyPreset={(preset, pct) => void applyPreset(preset, pct)} presetBusy={presetBusy || lowGas} presetSteps={presetSteps} presetNote={presetNote} limitBps={limitBps} />
+            )}
             {tab === "book" && <BookPanel city={city} />}
             {tab === "staff" && <StaffPanel city={city} onDone={onDone} />}
             {tab === "funds" && <>
@@ -214,6 +275,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                 <p className="text-xs leading-relaxed text-ink-soft">
                   {t.deputyActive(expiry, fmtBps(state.deputy.maxShiftBps))}
                   {!deputyActive && t.deputyOther}
+                  {state.deputy.budgetTotal > 0n && <> {t.deputyBudget(fmtAusd(Number(state.deputy.budgetLeft) / 1e6), fmtAusd(Number(state.deputy.budgetTotal) / 1e6))}</>}
                 </p>
               ) : (
                 <p className="text-xs leading-relaxed text-ink-soft">{t.deputyNone(fmtBps(DEPUTY_SHIFT_BPS))}</p>
@@ -253,7 +315,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
               </div>
               <ul className="space-y-1.5">
                 {WORKS.map((w) => {
-                  const open = developmentOf(city.totalAssets) >= w.unlockAt;
+                  const open = developmentOf(city.totalAssets) >= w.unlockAt || unlockAllWorks();
                   const on = style.works.includes(w.id as WorkId);
                   return (
                     <li key={w.id}>

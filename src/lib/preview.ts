@@ -1,39 +1,28 @@
-import type { CityView } from "./types";
+import { staticCatalog, CATEGORY_KIND } from "./catalog";
+import type { CityView, District } from "./types";
 
 /**
  * Kota contoh untuk tampilan awal saat belum ada kota di chain. Semua angka di sini adalah data contoh, bukan data
- * onchain, dan UI selalu menandainya sebagai "Preview".
+ * onchain, dan UI selalu menandainya sebagai "Preview". Distrik contoh memakai layanan dari katalog (TC67).
  */
+const CATALOG = staticCatalog();
+
+function city(id: string, name: string, mapId: string, feeBps: number, sharePrice: number, residents: number, idle: number, svc: [string, number][]): CityView {
+  const total = idle + svc.reduce((s, [, a]) => s + a, 0);
+  const districts: District[] = [
+    { id: "idle", kind: "idle", label: "Plaza", weight: idle / total, assets: idle, apyBps: null, simulated: false },
+    ...svc.map(([sid, assets]): District => {
+      const s = CATALOG.find((x) => x.id === sid)!;
+      return {
+        id: `svc-${sid}`, kind: CATEGORY_KIND[s.category], label: s.name, protocol: s.protocol, weight: assets / total, assets,
+        apyBps: s.apyBps ?? 168, simulated: true, serviceId: s.id, category: s.category, protocolTvlUsd: s.tvlUsd,
+      };
+    }),
+  ];
+  return { id, name, community: "Sample community", mapId, feeBps, totalAssets: total, sharePrice, residents, preview: true, districts };
+}
+
 export const PREVIEW_CITIES: CityView[] = [
-  {
-    id: "preview-scbd",
-    name: "SCBD Preview",
-    community: "Sample community",
-    mapId: "scbd-jakarta",
-    feeBps: 1000,
-    totalAssets: 18420,
-    sharePrice: 1.0042,
-    residents: 37,
-    preview: true,
-    districts: [
-      { id: "idle", kind: "idle", label: "Plaza", weight: 0.16, assets: 2950, apyBps: null, simulated: false },
-      { id: "lend", kind: "lending", label: "Lending district", protocol: "Morpho Grove x Steakhouse AUSD", weight: 0.58, assets: 10684, apyBps: 168, simulated: true },
-      { id: "vault", kind: "vault", label: "Vault district", protocol: "Aave V3 AUSD", weight: 0.26, assets: 4786, apyBps: 310, simulated: true },
-    ],
-  },
-  {
-    id: "preview-malioboro",
-    name: "Malioboro Preview",
-    community: "Sample community",
-    mapId: "malioboro-jogja",
-    feeBps: 800,
-    totalAssets: 9210,
-    sharePrice: 1.0019,
-    residents: 21,
-    preview: true,
-    districts: [
-      { id: "idle", kind: "idle", label: "Plaza", weight: 0.22, assets: 2026, apyBps: null, simulated: false },
-      { id: "lend", kind: "lending", label: "Lending district", protocol: "Morpho Grove x Steakhouse AUSD", weight: 0.78, assets: 7184, apyBps: 168, simulated: true },
-    ],
-  },
+  city("preview-scbd", "SCBD Preview", "scbd-jakarta", 1000, 1.0042, 37, 2950, [["aave-ausd", 4300], ["euler-ausd", 2600], ["upshift-earnausd", 3800], ["curve-ausd-3pool", 2100], ["shmonad", 2670]]),
+  city("preview-malioboro", "Malioboro Preview", "malioboro-jogja", 800, 1.0019, 21, 2026, [["morpho-grove", 3200], ["curvance-ausd", 2300], ["balancer-avusd", 1684]]),
 ];

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { hash01, type CityMap } from "./geometry";
 import type { LifeEvent } from "./life";
 import { box, merge, part, toonRamp } from "./props";
-import { THEMES, WORKS, type CityStyle, type Theme, type WorkId } from "./themes";
+import { THEMES, WORKS, unlockAllWorks, type CityStyle, type Theme, type WorkId } from "./themes";
 
 /**
  * Karya sipil: hal-hal yang dipilih walikota untuk mempercantik kotanya (air mancur, bunga, bendera, pasar, monumen,
@@ -344,7 +344,7 @@ export class CityCivic {
     this.t += dt;
     for (const [id, e] of this.entries) {
       const info = WORKS.find((w) => w.id === id);
-      const on = !!info && this.dev >= info.unlockAt;
+      const on = !!info && (this.dev >= info.unlockAt || unlockAllWorks());
       e.grow += ((on ? 1 : 0) - e.grow) * Math.min(1, dt * 2.5);
       if (Math.abs((on ? 1 : 0) - e.grow) < 0.004) e.grow = on ? 1 : 0;
       e.obj.visible = e.grow > 0.01;
@@ -355,7 +355,7 @@ export class CityCivic {
     }
     // Kembang api: bila dipilih dan sudah terbuka, tiap sekitar setengah menit.
     const fw = WORKS.find((w) => w.id === "fireworks");
-    if (this.style.works.includes("fireworks") && fw && this.dev >= fw.unlockAt) {
+    if (this.style.works.includes("fireworks") && fw && (this.dev >= fw.unlockAt || unlockAllWorks())) {
       if (this.fireworksAt === Infinity) this.fireworksAt = this.t + 4;
       if (this.t >= this.fireworksAt) { this.fireworksAt = this.t + 26 + hash01(this.t) * 8; this.emit({ type: "fireworks" }); }
     } else this.fireworksAt = Infinity;

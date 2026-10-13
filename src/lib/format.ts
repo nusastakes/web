@@ -6,6 +6,9 @@ export function fmtAusd(n: number, opts: { max?: number } = {}): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: abs >= 1000 ? 0 : 2, maximumFractionDigits: Math.max(max, abs >= 1000 ? 0 : 2) });
 }
 
+/** Bilangan bulat dengan pemisah ribuan (untuk ambang dana seperti "407" atau "3.968"). */
+export const fmtWhole = (n: number) => Math.round(n).toLocaleString("en-US");
+
 export const fmtPct = (n: number, digits = 2) => `${n >= 0 ? "" : "-"}${Math.abs(n).toFixed(digits)}%`;
 export const fmtBps = (bps: number) => fmtPct(bps / 100, bps % 100 === 0 ? 0 : 2);
 export const shortAddr = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");

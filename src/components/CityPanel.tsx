@@ -9,6 +9,8 @@ import { addressUrl } from "@/lib/config";
 import { fmtAusd, fmtBps, shortAddr, timeAgo } from "@/lib/format";
 import { DISTRICT_COLORS } from "@/lib/palette";
 import type { CityView, District, Hex } from "@/lib/types";
+import { CATALOG_COPY, serviceCopy } from "@/lib/copy-catalog";
+import { TUNING } from "@/lib/copy-tuning";
 import { IconCopy, IconExternal, IconInfo } from "./icons";
 import { Badge, Card, cx } from "./ui";
 
@@ -17,6 +19,8 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   me?: Hex;
+  /** Membuka setelan layanan untuk distrik bersetelan (walikota menyetel, pengunjung melihat). */
+  onTune?: (districtId: string) => void;
 }
 
 function Row({ d, active, onClick }: { d: District; active: boolean; onClick: () => void }) {
@@ -27,7 +31,7 @@ function Row({ d, active, onClick }: { d: District; active: boolean; onClick: ()
       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: DISTRICT_COLORS[d.kind] }} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-ink">{districtName(lang, d)}</span>
-        <span className="block truncate text-[11px] text-ink-soft">{d.protocol ?? (d.kind === "idle" ? t.notPlaced : "")}</span>
+        <span className="block truncate text-[11px] text-ink-soft">{d.category ? `${CATALOG_COPY[lang].category[d.category].name} · ${d.protocol ?? ""}` : d.protocol ?? (d.kind === "idle" ? t.notPlaced : "")}</span>
       </span>
       <span className="shrink-0 text-right">
         <span className="block text-sm font-semibold text-ink">{d.weight > 0 ? `${(d.weight * 100).toFixed(d.weight < 0.1 ? 1 : 0)}%` : t.empty}</span>
@@ -37,8 +41,9 @@ function Row({ d, active, onClick }: { d: District; active: boolean; onClick: ()
   );
 }
 
-export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
+export default function CityPanel({ city, selectedId, onSelect, me, onTune }: Props) {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [lang] = useLang();
   const t = APP[lang].panel;
   const selected = city.districts.find((d) => d.id === selectedId) ?? null;
@@ -86,6 +91,11 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
             {city.vault && <a className="ml-auto inline-flex items-center gap-1 hover:text-ink" href={addressUrl(city.vault)} target="_blank" rel="noreferrer">{t.vault} <IconExternal width={12} height={12} /></a>}
           </div>
         )}
+        {city.vault && (
+          <button className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline" onClick={() => { navigator.clipboard?.writeText(`${location.origin}/city?c=${city.vault}`); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1400); }}>
+            <IconCopy width={12} height={12} /> {linkCopied ? t.linkCopied : t.link}
+          </button>
+        )}
       </div>
 
       <div className="overflow-y-auto px-3 py-3">
@@ -107,20 +117,40 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
           <div className="mt-3 space-y-2 rounded-xl bg-slate-900/[0.04] p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-ink">{districtName(lang, selected)}</span>
-              {selected.simulated ? <Badge tone="warn">{t.simulated}</Badge> : selected.kind === "idle" ? <Badge>{t.idle}</Badge> : <Badge tone="good">{t.liveProto}</Badge>}
+              <span className="flex gap-1">
+                {selected.tunable && <Badge tone="accent">{TUNING[lang].badge}</Badge>}
+                {selected.simulated ? <Badge tone="warn">{t.simulated}</Badge> : selected.kind === "idle" ? <Badge>{t.idle}</Badge> : <Badge tone="good">{t.liveProto}</Badge>}
+              </span>
             </div>
             <dl className="grid grid-cols-3 gap-2 text-center">
               <div><dt className="text-[11px] text-ink-soft">{t.funds}</dt><dd className="text-sm font-semibold">{fmtAusd(selected.assets)}</dd></div>
               <div><dt className="text-[11px] text-ink-soft">{t.share}</dt><dd className="text-sm font-semibold">{(selected.weight * 100).toFixed(1)}%</dd></div>
               <div><dt className="text-[11px] text-ink-soft">{t.apy}</dt><dd className="text-sm font-semibold">{selected.apyBps === null ? "—" : fmtBps(selected.apyBps)}</dd></div>
             </dl>
-            {selected.simulated && (
+            {selected.serviceId && selected.category ? (() => {
+              const cc = CATALOG_COPY[lang];
+              const copy = serviceCopy(lang, selected.serviceId!, selected.category!);
+              return (
+                <div className="space-y-1.5 text-[11px] leading-relaxed text-ink-soft">
+                  <p><b className="text-ink">{cc.category[selected.category!].name}.</b> {copy.blurb}</p>
+                  <p><b className="text-ink">{t.svcFlow}:</b> {copy.flow}</p>
+                  <p><b className="text-ink">{t.svcRisk}:</b> {copy.risk}</p>
+                  {selected.protocolTvlUsd != null && <p>{t.svcTvl(selected.protocolTvlUsd >= 1e6 ? `$${(selected.protocolTvlUsd / 1e6).toFixed(1)}M` : `$${Math.round(selected.protocolTvlUsd / 1e3)}K`)}</p>}
+                  <p className="flex gap-2"><IconInfo width={14} height={14} className="mt-0.5 shrink-0" /><span>{cc.mirror}.</span></p>
+                </div>
+              );
+            })() : selected.simulated && (
               <p className="flex gap-2 text-[11px] leading-relaxed text-ink-soft">
                 <IconInfo width={14} height={14} className="mt-0.5 shrink-0" />
                 <span>{t.simNote("")[0]}<strong>{selected.protocol}</strong>{t.simNote("")[2]}</span>
               </p>
             )}
             {selected.kind === "idle" && <p className="text-[11px] leading-relaxed text-ink-soft">{t.idleNote}</p>}
+            {selected.tunable && onTune && (
+              <button className="btn btn-ghost w-full !py-1.5 text-xs" onClick={() => onTune(selected.id)}>
+                {isMayor ? TUNING[lang].open : TUNING[lang].view}
+              </button>
+            )}
           </div>
         )}
       </div>

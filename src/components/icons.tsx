@@ -17,6 +17,8 @@ export const IconArrowDown = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}>
 export const IconArrowUp = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M12 20V6M6 12l6-6 6 6" /></svg>);
 export const IconPlus = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M12 5v14M5 12h14" /></svg>);
 export const IconSwap = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" /></svg>);
+export const IconStage = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M3 20h18M5 20V10l7-5 7 5v10" /><path d="M9 20v-5h6v5M12 9.5v.01" /></svg>);
+export const IconRules = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M4 6h10M4 12h6M4 18h10" /><circle cx="17" cy="6" r="2.2" /><circle cx="13" cy="12" r="2.2" /><circle cx="17" cy="18" r="2.2" /></svg>);
 export const IconInfo = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>);
 export const IconRecenter = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /></svg>);
 export const IconLogo = (p: SVGProps<SVGSVGElement>) => (<svg {...base({ width: 22, height: 22, strokeWidth: 1.6, ...p })}><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></svg>);

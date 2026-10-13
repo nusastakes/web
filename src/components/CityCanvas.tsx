@@ -62,11 +62,13 @@ async function loadMap(id: string): Promise<CityMap> {
   const hit = mapCache.get(id);
   if (hit) return hit;
   if (id.startsWith("osm:")) {
-    // Area asli dari OpenStreetMap; bila semua server sibuk, pakai peta bawaan supaya kota tetap tampil.
+    // Area asli dari OpenStreetMap; bila semua server sibuk, lahan kosong prosedural (bukan peta tempat lain) supaya
+    // kota tetap tampil. Lahan itu tidak disimpan di cache, jadi percobaan berikutnya memuat peta asli lagi.
     const { loadOsmCity } = await import("@/lib/osm");
-    const map = (await loadOsmCity(id)) ?? (await loadMap("scbd-jakarta"));
-    mapCache.set(id, map);
-    return map;
+    const real = await loadOsmCity(id);
+    if (real) { mapCache.set(id, real); return real; }
+    const { proceduralCity } = await import("@/lib/scene/procedural");
+    return proceduralCity(id);
   }
   const res = await fetch(`/maps/${id}.city.json`);
   if (!res.ok) throw new Error(`peta ${id} tidak bisa dimuat (${res.status})`);
@@ -93,6 +95,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   const [error, setError] = useState<string | null>(null);
   const [flat, setFlat] = useState<CityMap | null>(null);
   const [loadedMap, setLoadedMap] = useState<string | null>(null);
+  const [placeholder, setPlaceholder] = useState(false);
   const ready = loadedMap === mapId;
   const [hovered, setHovered] = useState<string | null>(null);
   const onSelectRef = useRef(onSelect);
@@ -183,6 +186,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   // Muat peta saat berganti kota.
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
     const scene = sceneRef.current;
     if (!scene) return;
     loadMap(mapId)
@@ -192,9 +196,24 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
         scene.setDistricts(districtsRef.current);
         onMapLoaded?.(map);
         setLoadedMap(mapId);
+        setPlaceholder(!!map.fallback);
+        // Data peta asli belum bisa dimuat: tetap tampil lahan kosong dan coba lagi di latar (maksimal 5 kali).
+        if (map.fallback) {
+          let tries = 0;
+          const retry = () => {
+            if (cancelled || tries++ >= 5) return;
+            retryTimer = window.setTimeout(() => {
+              loadMap(mapId).then((m) => {
+                if (cancelled) return;
+                if (!m.fallback) { scene.setMap(m); scene.setDistricts(districtsRef.current); onMapLoaded?.(m); setPlaceholder(false); } else retry();
+              }).catch(retry);
+            }, 40_000);
+          };
+          retry();
+        }
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
-    return () => { cancelled = true; };
+    return () => { cancelled = true; window.clearTimeout(retryTimer); };
   }, [mapId, onMapLoaded]);
 
   // Alokasi berubah: bangun ulang distrik.
@@ -230,6 +249,11 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
       </div>
       {!ready && !error && (
         <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">Building the city…</div>
+      )}
+      {ready && placeholder && !error && !quiet && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-6">
+          <span className="rounded-full bg-white/85 px-3 py-1 text-[11px] text-slate-600 backdrop-blur">{APP[lang].mapFallback}</span>
+        </div>
       )}
       {error && (
         <div className="absolute inset-0">

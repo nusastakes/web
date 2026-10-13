@@ -18,6 +18,13 @@ export interface District {
   /** True bila yield-nya disimulasikan (mengikuti APY mainnet), bukan dari protokol sungguhan. */
   simulated: boolean;
   adapter?: Hex;
+  /** Layanan protokol dari katalog (TC67) bila adapter ini cermin dari satu protokol Monad. */
+  serviceId?: string;
+  category?: "bank" | "vault" | "staking" | "market";
+  /** TVL protokol aslinya di mainnet (dolar), dari katalog. */
+  protocolTvlUsd?: number | null;
+  /** True bila adapter bersetelan (TunedMirrorAdapter): walikota bisa menyetel layanan ini sebatas hak penyetor di protokolnya. */
+  tunable?: boolean;
 }
 
 export interface CityView {

@@ -3,51 +3,56 @@
 import { useEffect, useRef, useState } from "react";
 import { MAYOR } from "@/lib/copy-mayor";
 import { useLang } from "@/lib/lang";
-import { QUICK_PLACES, buildOsmCity, osmUri, rememberOsmCity, searchPlaces, type PlaceHit } from "@/lib/osm";
+import { DEFAULT_SIZE, QUICK_PLACES, buildOsmCity, densityOf, osmUri, rememberOsmCity } from "@/lib/osm";
 import type { CityMap } from "@/lib/scene/geometry";
-import { Notice, Spinner, cx, inputCls } from "../ui";
+import { Badge, Notice, Spinner, cx } from "../ui";
+import AreaPickerModal, { type PickedArea } from "./AreaPickerModal";
 
-/** Memilih area kota asli dari OpenStreetMap: tempat cepat atau pencarian, lalu pratinjau tapak bangunan dan jalan. */
+/**
+ * Memilih area kota asli dari OpenStreetMap: tempat cepat, atau pemilih di peta (kotak dengan tiga ukuran, ide alat kotak
+ * Arnis), lalu pratinjau tapak bangunan dan jalan dengan penilaian kepadatan data.
+ */
 export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: string | null, label?: string) => void; disabled?: boolean }) {
   const [lang] = useLang();
   const t = MAYOR[lang].place;
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<PlaceHit[] | null>(null);
-  const [picked, setPicked] = useState<PlaceHit | null>(null);
+  const locale = MAYOR[lang].locale;
+  const [picked, setPicked] = useState<PickedArea | null>(null);
   const [map, setMap] = useState<CityMap | null>(null);
-  const [busy, setBusy] = useState<"search" | "build" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
-  const search = async () => {
-    if (q.trim().length < 3) return;
-    setBusy("search"); setError(null);
-    try { setHits(await searchPlaces(q.trim())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
-  };
-
-  const choose = async (p: PlaceHit) => {
-    setPicked(p); setMap(null); setError(null); setBusy("build");
+  const choose = async (a: PickedArea) => {
+    setOpen(false); setPicked(a); setMap(null); setError(null); setBusy(true);
     onReadyRef.current(null);
     try {
-      const m = await buildOsmCity(p.lat, p.lon, p.name);
+      const m = await buildOsmCity(a.lat, a.lon, a.name, a.size);
       rememberOsmCity(m);
       setMap(m);
-      onReadyRef.current(osmUri(p.lat, p.lon), p.name);
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(null); }
+      onReadyRef.current(osmUri(a.lat, a.lon, a.size), a.name);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   };
 
   // Pratinjau 2D: tapak bangunan (gelap untuk yang tinggi) dan jalan.
+  const size = picked?.size ?? DEFAULT_SIZE;
   useEffect(() => {
     const c = canvas.current;
     if (!c || !map) return;
     const g = c.getContext("2d")!;
     const W = c.width, H = c.height;
     g.fillStyle = "#eef1fb"; g.fillRect(0, 0, W, H);
-    const s = Math.min(W, H) / 540;
+    const s = Math.min(W, H) / (size + 20);
     const tx = (x: number) => W / 2 + x * s, tz = (z: number) => H / 2 + z * s;
     g.lineCap = "round";
+    for (const ar of map.areas ?? []) {
+      g.fillStyle = ar.t === 0 ? "#bfe0f3" : "#d6efdc";
+      g.beginPath();
+      for (let i = 0; i < ar.p.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, tx(ar.p[i]), tz(ar.p[i + 1]));
+      g.closePath(); g.fill();
+    }
     for (const r of map.roads) {
       g.strokeStyle = r.f ? "#ffffff" : "#c9d1ec"; g.lineWidth = Math.max(1, r.w * s);
       g.beginPath();
@@ -61,38 +66,35 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
       for (let i = 0; i < b.p.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, tx(b.p[i]), tz(b.p[i + 1]));
       g.closePath(); g.fill();
     }
-  }, [map]);
+  }, [map, size]);
+
+  const start = picked ?? { ...QUICK_PLACES[0], size: DEFAULT_SIZE };
+  const density = map ? densityOf(map.buildings.length, size) : null;
+  const km2 = ((size / 1000) ** 2).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {QUICK_PLACES.map((p) => (
-          <button key={p.name} type="button" disabled={disabled || busy === "build"} onClick={() => choose(p)}
+          <button key={p.name} type="button" disabled={disabled || busy} onClick={() => choose({ ...p, size: DEFAULT_SIZE })}
             className={cx("rounded-full px-2.5 py-1 text-[11px] font-semibold", picked?.name === p.name ? "bg-accent text-white" : "bg-slate-900/5 text-ink")}>{p.name}</button>
         ))}
       </div>
-      <div className="flex gap-2">
-        <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void search(); } }}
-          placeholder={t.search} disabled={disabled} aria-label={t.searchAria} />
-        <button type="button" className="btn btn-ghost !px-3" onClick={search} disabled={disabled || busy !== null || q.trim().length < 3}>{busy === "search" ? <Spinner /> : t.searchBtn}</button>
-      </div>
-      {hits && hits.length > 0 && !picked && (
-        <ul className="max-h-36 space-y-1 overflow-y-auto">
-          {hits.map((h) => (
-            <li key={`${h.lat},${h.lon}`}><button type="button" onClick={() => choose(h)} className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-ink hover:bg-slate-900/5">{h.name}</button></li>
-          ))}
-        </ul>
-      )}
-      {hits && hits.length === 0 && <p className="text-[11px] text-ink-soft">{t.none}</p>}
-      {busy === "build" && <div className="flex items-center gap-2 text-xs text-ink-soft"><Spinner /> {t.fetching}</div>}
-      {map && (
+      <button type="button" className="btn btn-ghost w-full" disabled={disabled || busy} onClick={() => setOpen(true)}>{map ? t.changeMap : t.openMap}</button>
+      {busy && <div className="flex items-center gap-2 text-xs text-ink-soft"><Spinner /> {t.fetching}</div>}
+      {map && density && (
         <div className="space-y-1">
           <canvas ref={canvas} width={360} height={220} className="w-full rounded-xl border border-slate-900/10" aria-label={t.previewAria} />
-          <p className="text-[11px] text-ink-soft">{t.info(picked?.name ?? "", map.buildings.length, map.roads.length)} {map.attribution}.</p>
+          <p className="text-[11px] text-ink-soft">{t.info(picked?.name ?? "", map.buildings.length, map.roads.length, size, km2)} {map.attribution}.</p>
+          <div className="flex items-center gap-2 text-[11px] text-ink-soft">
+            <Badge tone={density === "sparse" ? "warn" : density === "dense" ? "good" : "accent"}>{t.density[density]}</Badge>
+            <span>{t.densityNote}</span>
+          </div>
           <button type="button" className="text-[11px] font-semibold text-accent hover:underline" onClick={() => { setPicked(null); setMap(null); onReadyRef.current(null); }}>{t.another}</button>
         </div>
       )}
       {error && <Notice tone="warn">{error}</Notice>}
+      {open && <AreaPickerModal start={start} onPick={(a) => void choose(a)} onClose={() => setOpen(false)} />}
     </div>
   );
 }

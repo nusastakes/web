@@ -21,6 +21,13 @@ export default function CityMap2D({ map, districts }: { map: CityMap; districts:
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
       const tx = (x: number) => W / 2 + (x - cx) * s, tz = (z: number) => H / 2 + (z - cz) * s;
       g.lineCap = "round"; g.lineJoin = "round";
+      // Tutupan lahan (air dan hijau) di bawah jalan dan bangunan.
+      for (const ar of map.areas ?? []) {
+        g.fillStyle = ar.t === 0 ? "#bfe0f3" : "#d6efdc";
+        g.beginPath();
+        for (let i = 0; i < ar.p.length; i += 2) (i ? g.lineTo : g.moveTo).call(g, tx(ar.p[i]), tz(ar.p[i + 1]));
+        g.closePath(); g.fill();
+      }
       for (const r of map.roads) {
         g.strokeStyle = r.f ? "#ffffff" : "#cfd6ee"; g.lineWidth = Math.max(1, r.w * s);
         g.beginPath();

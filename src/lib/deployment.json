@@ -2,7 +2,7 @@
   "network": "Monad testnet",
   "chainId": 10143,
   "deployedAt": "2026-10-13 (WIB)",
-  "version": 2,
+  "version": 3,
   "asset": {
     "name": "AUSD (testnet)",
     "address": "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC",
@@ -11,10 +11,12 @@
   "sourceId": "0x71809e1e29dc09210f61029b6e5b4f037fb332bdf7caa16cf9362c78c500926d",
   "sourceLabel": "Morpho Grove x Steakhouse High Yield AUSD (mainnet)",
   "contracts": {
-    "CityGuardian": "0x083899bEE8138E5f951db568926393FDb1F418A2",
-    "CityFactory": "0x6765F0C80F6a7D5EC7Af120d12e81628F641508E",
-    "ApyFeed": "0x707A675DDc976B0E9C6B520Dbd0326204F30d540",
-    "YieldReserve": "0x18B15f540E231Fb75F9c86a080a69c3D0FAB27C1",
-    "MirrorYieldAdapter": "0x25BcA4f0ea34F115Cb7c620626fBBa95647E8690"
+    "CityGuardian": "0x74F881Ec300DfD1BfD26b4c0392f713fc775E7B9",
+    "CityFactory": "0xDC9A322E95E7d9214fA794D39534a15B4aB3d9fF",
+    "ApyFeed": "0x3328AEbB57Ee0bc8d2C7f68468dEe6B9b50926b5",
+    "YieldReserve": "0x40e194d12BC3F6a6b26E8B7808f749c88281Ef96",
+    "MirrorYieldAdapter": "0x156fDb80Bd936f1CF1d45A1a167B660A82043080",
+    "AgentMarketplace": "0x241E3f8f02C53e075794989b9E7BD9832e539D29",
+    "CityServices": "0x9d156f5fdfa87925AF7c574f0791d804FFC9B4e1"
   }
 }

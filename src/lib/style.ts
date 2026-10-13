@@ -50,7 +50,8 @@ export function useCityStyle(id: string | undefined, vault?: Hex, wallet?: Walle
     if (!vault) return;
     let cancelled = false;
     getCityStyle(vault)
-      .then((r) => { if (!cancelled) { setRemote({ vault, code: r.code, nonce: BigInt(r.nonce || "0") }); setSync("shared"); } })
+      .then((r) => { if (!cancelled) { // Entri bertanda tangan relayer (pilihan walikota yang terbaru) lebih dulu, lalu gaya yang tercatat di vault (v3).
+          setRemote({ vault, code: r.code || r.onchain || "", nonce: BigInt(r.nonce || "0") }); setSync("shared"); } })
       .catch(() => { if (!cancelled) { setRemote(null); setSync("local"); } });
     return () => { cancelled = true; };
   }, [vault]);

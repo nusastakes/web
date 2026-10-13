@@ -30,7 +30,7 @@ const EN = {
     reopen: "Show getting-started guide",
   },
   top: { choose: "Choose a city", preview: "Preview", liveOn: "Live on Monad testnet", noLive: "No live cities yet. Found the first one.", previewHdr: "Preview · sample data", board: "Leaderboard", exploreAria: "Explore cities", home: "Home", net: "Monad testnet" },
-  dock: { deposit: "Deposit", withdraw: "Withdraw", found: "Found city", manage: "Manage", reset: "Reset view", details: "City details" },
+  dock: { deposit: "Deposit", withdraw: "Withdraw", found: "Found city", manage: "Manage", panggung: "Stage", rules: "Rules", reset: "Reset view", details: "City details" },
   kpi: {
     assets: "Total assets", districts: (n: number) => `${n} district${n === 1 ? "" : "s"}`, yield: "Yield", simulated: "Simulated · mirrors mainnet", none: "No funds placed yet", protocol: "From the protocol",
     price: "Share price", since: "since founding", residents: "Residents", sample: "Sample data", fee: "Mayor fee", onlyProfit: "Only on profit",
@@ -48,18 +48,18 @@ const EN = {
   dep: {
     title: (n: string) => `Deposit into ${n}`, sub: "Move your funds into the city. You can withdraw at any time.", previewNote: "This is a preview city with sample data. Pick a live city from the list at the top, or found your own.",
     amount: "Amount (AUSD)", amountAria: "Amount in AUSD", max: (v: string) => `Max ${v}`, haveBal: (v: string) => `You have ${v} AUSD. Test money is free on this network.`, getBtn: "Get 10,000 AUSD",
-    pErrEnter: "Enter an amount, for example 10.", pErrMin: "The minimum is 0.01 AUSD.", pErrBal: "You do not have that much AUSD.", pErrCap: "This city cannot take that much more.",
+    pErrEnter: "Enter an amount, for example 10.", pErrMin: "The minimum is 0.01 AUSD.", pErrBal: "You do not have that much AUSD.", pErrCap: "This city cannot take that much more.", pErrQuarantine: "Deposits are paused: one district is in withdraw-only mode. You can still withdraw.",
     receive: (p: string) => `You receive city shares worth the same amount at today's price (${p} AUSD each). You pay no gas: you only sign, and a relayer sends the transaction.`, simYield: " Yield here is simulated on testnet.",
     deposited: "Deposited.", firstTx: (s: string, c: number) => ` Account to first transaction: ${s} s with ${c} passkey prompt${c === 1 ? "" : "s"}.`, working: "Working…", btn: (a: string) => `Deposit ${a} AUSD`, again: (a: string) => `Deposit ${a} AUSD again`,
   },
   wd: {
-    title: (n: string) => `Withdraw from ${n}`, sub: "Your funds come back to your account. Money leaving always asks for your passkey.", previewNote: "This is a preview city with sample data, so there is nothing to withdraw.",
+    title: (n: string) => `Withdraw from ${n}`, sub: "Your funds come back to your account. Money leaving always asks for your passkey.", previewNote: "This is a preview city with sample data, so there is nothing to withdraw.", quarantined: "One district is in withdraw-only mode (quarantined). Withdrawing now is paid at the price of what is liquid today and gives up your share of the locked part. The amount below already uses that price.",
     withdrawn: "Withdrawn. The funds are back in your account.", done: "Done", retry: "Try again", reading: "Reading your position…", none: "You have no funds in this city yet. Deposit first.",
     yours: "Your funds in this city", all: "All", receive: "You receive", working: "Working…", btn: (all: boolean, pct: number) => `Withdraw ${all ? "everything" : `${pct}%`}`,
   },
   panel: {
     notPlaced: "Not placed anywhere", empty: "empty", noReport: "No report yet.", notHired: "This city has no Humas yet. The mayor can hire one in the city hall.", writing: "The weekly report is still being written. Try again in a minute.",
-    noCommunity: "No community", previewBadge: "Preview · sample data", live: "Live", youMayor: "You are the mayor", mayor: "Mayor", copyAria: "Copy mayor address", copied: "Copied", vault: "Vault",
+    noCommunity: "No community", previewBadge: "Preview · sample data", live: "Live", youMayor: "You are the mayor", mayor: "Mayor", copyAria: "Copy mayor address", copied: "Copied", vault: "Vault", link: "Copy city link", linkCopied: "Link copied", svcFlow: "How it earns", svcRisk: "Risk", svcTvl: (v: string) => `The real protocol holds about ${v} on mainnet.`,
     where: "Where the money is", showAll: "Show all", simulated: "Simulated", idle: "Idle", liveProto: "Live protocol", funds: "Funds", share: "Share", apy: "APY",
     simNote: (p: string) => [`Testnet has no lending protocol that accepts AUSD, so nothing is lent here. This district earns the live APY of `, p, `, paid from a testnet reserve. The real protocol is used on mainnet.`] as [string, string, string],
     idleNote: "The plaza holds funds that the mayor has not placed anywhere. They earn nothing and can be withdrawn at any time.",
@@ -73,6 +73,7 @@ const EN = {
   },
   attribution: "Map data © OpenStreetMap contributors · Overture Maps Foundation. Testnet only; no real money.",
   no3d: "This device cannot show the 3D city, so here is the map. Everything else works.",
+  mapFallback: "The real map of this area could not be loaded, so you see open land for now. Trying again in the background.",
   intro: {
     kicker: "Welcome to Nusastakes", next: "Next", skip: "Skip", demo: "Watch the 80-second demo", explore: "Explore cities", look: "Look around",
     steps: [
@@ -114,7 +115,7 @@ const ID: typeof EN = {
     reopen: "Tampilkan panduan mulai",
   },
   top: { choose: "Pilih kota", preview: "Contoh", liveOn: "Aktif di Monad testnet", noLive: "Belum ada kota aktif. Dirikan yang pertama.", previewHdr: "Contoh · data contoh", board: "Peringkat", exploreAria: "Jelajahi kota", home: "Beranda", net: "Monad testnet" },
-  dock: { deposit: "Setor", withdraw: "Tarik", found: "Dirikan kota", manage: "Kelola", reset: "Setel ulang tampilan", details: "Rincian kota" },
+  dock: { deposit: "Setor", withdraw: "Tarik", found: "Dirikan kota", manage: "Kelola", panggung: "Panggung", rules: "Aturan", reset: "Setel ulang tampilan", details: "Rincian kota" },
   kpi: {
     assets: "Total dana", districts: (n) => `${n} distrik`, yield: "Imbal hasil", simulated: "Simulasi · meniru mainnet", none: "Belum ada dana yang ditempatkan", protocol: "Dari protokol",
     price: "Harga saham kota", since: "sejak didirikan", residents: "Penduduk", sample: "Data contoh", fee: "Fee walikota", onlyProfit: "Hanya dari untung",
@@ -132,18 +133,18 @@ const ID: typeof EN = {
   dep: {
     title: (n) => `Setor ke ${n}`, sub: "Pindahkan dana Anda ke kota. Bisa ditarik kapan saja.", previewNote: "Ini kota contoh dengan data contoh. Pilih kota aktif dari daftar di atas, atau dirikan kota Anda sendiri.",
     amount: "Jumlah (AUSD)", amountAria: "Jumlah dalam AUSD", max: (v) => `Maks ${v}`, haveBal: (v) => `Anda punya ${v} AUSD. Uang uji gratis di jaringan ini.`, getBtn: "Ambil 10.000 AUSD",
-    pErrEnter: "Masukkan jumlah, misalnya 10.", pErrMin: "Minimalnya 0,01 AUSD.", pErrBal: "AUSD Anda tidak cukup.", pErrCap: "Kota ini tidak bisa menampung sebanyak itu lagi.",
+    pErrEnter: "Masukkan jumlah, misalnya 10.", pErrMin: "Minimalnya 0,01 AUSD.", pErrBal: "AUSD Anda tidak cukup.", pErrCap: "Kota ini tidak bisa menampung sebanyak itu lagi.", pErrQuarantine: "Setoran dijeda: satu distrik sedang dalam mode hanya-tarik. Anda tetap bisa menarik dana.",
     receive: (p) => `Anda menerima saham kota senilai sama dengan harga hari ini (${p} AUSD per saham). Anda tidak membayar gas: Anda hanya menandatangani, dan relayer yang mengirim transaksinya.`, simYield: " Imbal hasil di sini adalah simulasi di testnet.",
     deposited: "Setoran berhasil.", firstTx: (s, c) => ` Dari akun ke transaksi pertama: ${s} dtk dengan ${c} permintaan passkey.`, working: "Memproses…", btn: (a) => `Setor ${a} AUSD`, again: (a) => `Setor ${a} AUSD lagi`,
   },
   wd: {
-    title: (n) => `Tarik dari ${n}`, sub: "Dana kembali ke akun Anda. Uang yang keluar selalu meminta passkey Anda.", previewNote: "Ini kota contoh dengan data contoh, jadi tidak ada yang bisa ditarik.",
+    title: (n) => `Tarik dari ${n}`, sub: "Dana kembali ke akun Anda. Uang yang keluar selalu meminta passkey Anda.", previewNote: "Ini kota contoh dengan data contoh, jadi tidak ada yang bisa ditarik.", quarantined: "Satu distrik sedang dalam mode hanya-tarik (karantina). Menarik sekarang dibayar pada harga bagian yang likuid hari ini dan melepas bagian Anda dari dana yang terkunci. Jumlah di bawah sudah memakai harga itu.",
     withdrawn: "Penarikan berhasil. Dana sudah kembali ke akun Anda.", done: "Selesai", retry: "Coba lagi", reading: "Membaca posisi Anda…", none: "Anda belum punya dana di kota ini. Setor dulu.",
     yours: "Dana Anda di kota ini", all: "Semua", receive: "Anda menerima", working: "Memproses…", btn: (all, pct) => `Tarik ${all ? "semuanya" : `${pct}%`}`,
   },
   panel: {
     notPlaced: "Belum ditempatkan di mana pun", empty: "kosong", noReport: "Belum ada laporan.", notHired: "Kota ini belum punya Humas. Walikota bisa menyewanya di balai kota.", writing: "Laporan mingguan masih ditulis. Coba lagi semenit lagi.",
-    noCommunity: "Tanpa komunitas", previewBadge: "Contoh · data contoh", live: "Aktif", youMayor: "Anda walikotanya", mayor: "Walikota", copyAria: "Salin alamat walikota", copied: "Tersalin", vault: "Brankas",
+    noCommunity: "Tanpa komunitas", previewBadge: "Contoh · data contoh", live: "Aktif", youMayor: "Anda walikotanya", mayor: "Walikota", copyAria: "Salin alamat walikota", copied: "Tersalin", vault: "Brankas", link: "Salin tautan kota", linkCopied: "Tautan tersalin", svcFlow: "Cara menghasilkan", svcRisk: "Risiko", svcTvl: (v) => `Protokol aslinya menyimpan sekitar ${v} di mainnet.`,
     where: "Di mana uangnya", showAll: "Tampilkan semua", simulated: "Simulasi", idle: "Menganggur", liveProto: "Protokol sungguhan", funds: "Dana", share: "Porsi", apy: "APY",
     simNote: (p) => [`Testnet tidak punya protokol pinjaman yang menerima AUSD, jadi tidak ada yang dipinjamkan di sini. Distrik ini mendapat APY langsung dari `, p, `, dibayar dari cadangan testnet. Protokol aslinya dipakai di mainnet.`],
     idleNote: "Alun-alun menyimpan dana yang belum ditempatkan walikota di mana pun. Dana ini tidak menghasilkan apa-apa dan bisa ditarik kapan saja.",
@@ -157,6 +158,7 @@ const ID: typeof EN = {
   },
   attribution: "Data peta © OpenStreetMap contributors · Overture Maps Foundation. Hanya testnet; bukan uang sungguhan.",
   no3d: "Perangkat ini tidak bisa menampilkan kota 3D, jadi inilah petanya. Fitur lainnya tetap berfungsi.",
+  mapFallback: "Peta asli area ini belum bisa dimuat, jadi untuk sementara tampil lahan kosong. Mencoba lagi di latar.",
   intro: {
     kicker: "Selamat datang di Nusastakes", next: "Lanjut", skip: "Lewati", demo: "Tonton demo 80 detik", explore: "Jelajahi kota", look: "Lihat-lihat",
     steps: [
@@ -173,7 +175,7 @@ const ID: typeof EN = {
 export const APP: Record<Lang, typeof EN> = { en: EN, id: ID };
 
 /** Nama distrik menurut bahasa untuk distrik bawaan (alun-alun, pinjaman, brankas); distrik lain memakai labelnya sendiri. */
-export function districtName(lang: Lang, d: { kind: string; label: string }): string {
-  if (lang === "en") return d.label;
+export function districtName(lang: Lang, d: { kind: string; label: string; serviceId?: string }): string {
+  if (lang === "en" || d.serviceId) return d.label;
   return d.kind === "idle" ? "Alun-alun" : d.kind === "lending" ? "Distrik pinjaman" : d.kind === "vault" ? "Distrik brankas" : d.label;
 }
