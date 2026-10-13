@@ -62,7 +62,13 @@ export default function RulesSheet({ city, onClose }: Props) {
       if (pr?.presets?.length) setPresets(pr.presets);
     } catch (e) { setLoadError(humanError(e)); }
   }, [city.vault]);
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  // Status autopilot dan log tindakannya berubah tanpa aksi di layar ini (izin baru terbaca relayer, autopilot berjalan):
+  // perbarui tiap 15 detik selama lembar terbuka.
+  useEffect(() => {
+    queueMicrotask(() => void load());
+    const id = window.setInterval(() => void load(), 15_000);
+    return () => window.clearInterval(id);
+  }, [load]);
 
   // --- Rangkai aturan baru ------------------------------------------------------------------------------------
   const [metric, setMetric] = useState<Metric>("apy");
