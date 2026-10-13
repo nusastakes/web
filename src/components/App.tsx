@@ -6,7 +6,7 @@ import { useCityActivity } from "@/lib/activity";
 import { useCityStyle } from "@/lib/style";
 import { useCities } from "@/lib/hooks";
 import { PREVIEW_CITIES } from "@/lib/preview";
-import { WalletProvider, useWallet } from "@/lib/wallet";
+import { useWallet } from "@/lib/wallet";
 import ActionDock, { type SheetKind } from "./ActionDock";
 import CityPanel from "./CityPanel";
 import KpiRow from "./KpiRow";
@@ -125,6 +125,7 @@ function Shell() {
   );
 }
 
+/** Kota. Penyedia akun ada di `app/layout.tsx` supaya sesi passkey bertahan antar halaman. */
 export default function App() {
-  return <WalletProvider><Shell /></WalletProvider>;
+  return <Shell />;
 }

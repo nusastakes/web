@@ -7,6 +7,14 @@ penduduknya. Kotanya tampil sebagai kota 3D dari peta asli yang tumbuh mengikuti
 Jaringan: **Monad testnet** (chainId 10143). Yield di testnet adalah simulasi yang mengikuti APY vault AUSD di mainnet,
 dan selalu diberi label "simulated" di layar.
 
+## Halaman
+
+| Route | Isi |
+|---|---|
+| `/` | Halaman depan: kota 3D hidup di latar, angka platform langsung, cara kerja, kota teratas |
+| `/signin` | Buat akun atau masuk lagi dengan passkey, daftar perangkat yang didukung; `?next=` menentukan tujuan setelah masuk |
+| `/city` | Aplikasi kota; `?demo=1` memutar demo 80 detik, `?all=1` menampilkan kota uji |
+
 ## Fitur
 
 | Fitur | Isi | Kode |

@@ -24,6 +24,7 @@ export interface SceneApi {
   setWeather: (mode: "auto" | "clear" | "rain") => void;
   openTownHall: () => void;
   resetCamera: () => void;
+  setPaused: (p: boolean) => void;
 }
 
 export interface CityTick { time: string; phase: string; hour: number; stats: CityStats }
@@ -47,6 +48,10 @@ interface Props {
   cityName?: string;
   /** Gedung yang dibelah dan isinya (null saat ditutup). */
   onBuilding?: (info: InteriorInfo | null) => void;
+  /** Geser gambar ke kiri (positif) atau kanan (negatif) di layar lebar; bawaan memberi ruang untuk panel kanan. */
+  shift?: number;
+  /** Tanpa label distrik dan pin kejadian (untuk latar halaman depan). */
+  quiet?: boolean;
 }
 
 const mapCache = new Map<string, CityMap>();
@@ -69,13 +74,16 @@ async function loadMap(id: string): Promise<CityMap> {
 }
 
 /** Kota 3D. Adegan three.js hidup di dalam komponen ini; React hanya mengirim peta, distrik, dan pilihan. */
-export default function CityCanvas({ mapId, districts, selectedId, onSelect, onMapLoaded, resetSignal = 0, onScene, style, onTick, onInspect, cityName, onBuilding }: Props) {
+export default function CityCanvas({ mapId, districts, selectedId, onSelect, onMapLoaded, resetSignal = 0, onScene, style, onTick, onInspect, cityName, onBuilding, shift: shiftPx = 170, quiet = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<CityScene | null>(null);
   const labelRefs = useRef(new Map<string, HTMLDivElement>());
   const floatersRef = useRef<HTMLDivElement>(null);
   const chipsRef = useRef(new Map<string, HTMLDivElement>());
   const onSceneRef = useRef(onScene);
+  const shiftRef = useRef(shiftPx);
+  const quietRef = useRef(quiet);
+  useEffect(() => { quietRef.current = quiet; }, [quiet]);
   const onTickRef = useRef(onTick);
   const onInspectRef = useRef(onInspect);
   const onBuildingRef = useRef(onBuilding);
@@ -115,6 +123,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
         },
         onFloaters: (items: Floater[]) => {
           const host = floatersRef.current;
+          if (quietRef.current) { for (const el of chipsRef.current.values()) el.remove(); chipsRef.current.clear(); return; }
           if (!host) return;
           const chips = chipsRef.current;
           const seen = new Set<string>();
@@ -145,9 +154,9 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
     const chips = chipsRef.current;
     onSceneRef.current?.({
       emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), focusDistrict: (id) => scene.focusDistrict(id),
-      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m), openTownHall: () => scene.openTownHall(), resetCamera: () => scene.resetCamera(true),
+      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m), openTownHall: () => scene.openTownHall(), resetCamera: () => scene.resetCamera(true), setPaused: (p) => scene.setPaused(p),
     });
-    const shift = () => scene.setViewShift(window.innerWidth >= 768 ? 170 : 0);
+    const shift = () => scene.setViewShift(window.innerWidth >= 768 ? shiftRef.current : 0);
     shift();
     window.addEventListener("resize", shift);
     return () => {
@@ -199,7 +208,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
       {/* Pin kejadian (truk bermuatan, acara, usulan): dibuat langsung di DOM, posisinya ditulis tiap frame. */}
       <div ref={floatersRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {districts.filter((d) => d.weight > 0).map((d) => (
+        {!quiet && districts.filter((d) => d.weight > 0).map((d) => (
           <div
             key={d.id}
             ref={(el) => { if (el) labelRefs.current.set(d.id, el); else labelRefs.current.delete(d.id); }}

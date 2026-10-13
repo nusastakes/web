@@ -106,6 +106,8 @@ export class CityScene {
   private inspectClock = 0;
   private siteKey = "";
   private shopsOpen = 1;
+  /** Dijeda saat tidak terlihat (mis. halaman depan di-scroll melewati adegan). */
+  private paused = false;
   /** Mode hemat untuk ponsel dan perangkat lemah: bayangan lebih kecil, piksel lebih sedikit, kota sedikit lebih sepi. */
   private lowPower = false;
   /** Hujan 0..1 dan butir hujan (garis jatuh di sekitar pusat pandangan). */
@@ -468,6 +470,8 @@ export class CityScene {
   }
 
   // --- Jam kota ---------------------------------------------------------------------------------------------
+
+  setPaused(p: boolean) { this.paused = p; }
 
   /** Cuaca: "auto" (hujan sore sesekali), "clear", atau "rain". */
   setWeather(mode: "auto" | "clear" | "rain") { this.clock.weather = mode; }
@@ -980,7 +984,7 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
 
   private applyViewShift() {
     const { w, h } = this.rect;
-    if (this.viewShift > 0 && w > 600) this.camera.setViewOffset(w, h, this.viewShift, 0, w, h);
+    if (this.viewShift !== 0 && w > 600) this.camera.setViewOffset(w, h, this.viewShift, 0, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
@@ -988,6 +992,7 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
   private frame = () => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
+    if (this.paused) { this.timer.update(); return; }
     this.timer.update();
     const dt = Math.min(0.05, this.timer.getDelta());
 

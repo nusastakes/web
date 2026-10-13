@@ -34,7 +34,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .glass {

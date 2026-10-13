@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import brand from "@/lib/brand.json";
 import { fmtAusd } from "@/lib/format";
 import type { CityView } from "@/lib/types";
@@ -33,10 +34,10 @@ export default function TopBar({ cities, preview, current, onPick, onAfterAccoun
   return (
     <Card className="pointer-events-auto flex h-14 items-center justify-between gap-3 px-3 sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex items-center gap-2 text-ink">
+        <Link href="/" className="flex items-center gap-2 text-ink" aria-label="Home">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white"><IconLogo width={18} height={18} /></span>
           <span className="hidden text-[15px] font-semibold tracking-tight sm:block">{brand.name}</span>
-        </div>
+        </Link>
         <div className="relative min-w-0">
           <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-900/10 bg-white/70 px-3 py-1.5 text-sm font-medium text-ink hover:bg-white">
             <span className="truncate">{current?.name ?? "Choose a city"}</span>
