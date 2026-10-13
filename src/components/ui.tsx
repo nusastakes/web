@@ -46,7 +46,7 @@ export function Stat({ icon, label, value, unit, sub, tone }: { icon: ReactNode;
 
 export function Sheet({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
   return (
-    <Card className="pointer-events-auto flex max-h-[calc(100dvh-13rem)] w-full flex-col overflow-hidden sm:w-[400px]">
+    <Card className="pointer-events-auto flex max-h-[calc(100dvh-13rem)] w-full flex-col overflow-hidden max-sm:max-h-[calc(100dvh-10.5rem)] max-sm:bg-white/97! sm:w-[400px]">
       <div className="flex items-start justify-between gap-3 border-b border-slate-900/5 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-ink">{title}</h2>

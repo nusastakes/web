@@ -11,7 +11,7 @@ const SPEEDS = [{ label: "1×", sph: 16 }, { label: "4×", sph: 4 }, { label: "1
 const TONE: Record<string, string> = { blue: "#3f6bff", green: "#10b981", amber: "#f59e0b", red: "#ef4444", violet: "#7a5cff", gold: "#f5b301" };
 
 /** Jam kota, kecepatan waktu, dan ringkasan kegiatan (simulasi tampilan, bukan data onchain). */
-export function LifeClock({ tick, api, speed, onSpeed }: { tick: CityTick | null; api: SceneApi | null; speed: number; onSpeed: (sph: number) => void }) {
+export function LifeClock({ tick, api, speed, onSpeed, onDemo }: { tick: CityTick | null; api: SceneApi | null; speed: number; onSpeed: (sph: number) => void; onDemo?: () => void }) {
   const [weather, setWeather] = useState<"auto" | "clear" | "rain">("auto");
   if (!tick) return null;
   const s = tick.stats;
@@ -43,6 +43,7 @@ export function LifeClock({ tick, api, speed, onSpeed }: { tick: CityTick | null
             className={cx("rounded-lg px-2 py-0.5 text-[10.5px] font-semibold capitalize", weather === m ? "bg-slate-900/80 text-white" : "bg-slate-900/5 text-ink")}>{m === "auto" ? "Weather: auto" : m}</button>
         ))}
       </div>
+      {onDemo && <button onClick={onDemo} className="mt-1.5 w-full rounded-lg bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">▶ Watch the demo (80 s)</button>}
       <p className="mt-1.5 text-[10px] text-ink-soft/80">Simulated city life. Click a building to look inside, or a car, bus, or person to see what they are doing.</p>
     </Card>
   );

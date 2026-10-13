@@ -8,6 +8,7 @@ import type { CityStyle } from "@/lib/scene/themes";
 import type { InteriorInfo } from "@/lib/scene/interior";
 import type { District } from "@/lib/types";
 import { DISTRICT_COLORS } from "@/lib/palette";
+import CityMap2D from "./CityMap2D";
 
 /** Pintu masuk ke adegan untuk komponen lain: menjalankan kejadian dan menggerakkan kamera. */
 export interface SceneApi {
@@ -21,6 +22,8 @@ export interface SceneApi {
   closeBuilding: () => void;
   focusFloor: (level: number) => void;
   setWeather: (mode: "auto" | "clear" | "rain") => void;
+  openTownHall: () => void;
+  resetCamera: () => void;
 }
 
 export interface CityTick { time: string; phase: string; hour: number; stats: CityStats }
@@ -77,6 +80,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   const onInspectRef = useRef(onInspect);
   const onBuildingRef = useRef(onBuilding);
   const [error, setError] = useState<string | null>(null);
+  const [flat, setFlat] = useState<CityMap | null>(null);
   const [loadedMap, setLoadedMap] = useState<string | null>(null);
   const ready = loadedMap === mapId;
   const [hovered, setHovered] = useState<string | null>(null);
@@ -141,7 +145,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
     const chips = chipsRef.current;
     onSceneRef.current?.({
       emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), focusDistrict: (id) => scene.focusDistrict(id),
-      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m),
+      setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m), openTownHall: () => scene.openTownHall(), resetCamera: () => scene.resetCamera(true),
     });
     const shift = () => scene.setViewShift(window.innerWidth >= 768 ? 170 : 0);
     shift();
@@ -155,6 +159,14 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
       sceneRef.current = null;
     };
   }, []);
+
+  // Tanpa WebGL: tetap muat peta dan gambar versi 2D-nya.
+  useEffect(() => {
+    if (!error) return;
+    let cancelled = false;
+    loadMap(mapId).then((m) => { if (!cancelled) setFlat(m); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [error, mapId]);
 
   // Muat peta saat berganti kota.
   useEffect(() => {
@@ -208,8 +220,11 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
         <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">Building the city…</div>
       )}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-slate-600">
-          The 3D view could not start ({error}). The rest of the app still works.
+        <div className="absolute inset-0">
+          {flat && <CityMap2D map={flat} districts={districts} />}
+          <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-6">
+            <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] text-slate-600 backdrop-blur">This device cannot show the 3D city, so here is the map. Everything else works.</span>
+          </div>
         </div>
       )}
     </div>

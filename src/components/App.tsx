@@ -19,6 +19,8 @@ import WithdrawSheet from "./sheets/WithdrawSheet";
 
 import type { CityTick, SceneApi } from "./CityCanvas";
 import { BuildingCard, InspectCard, LifeClock } from "./LifeHud";
+import DemoDirector from "./DemoDirector";
+import IntroTour from "./IntroTour";
 import type { InteriorInfo } from "@/lib/scene/interior";
 import type { Inspect } from "@/lib/scene/life";
 
@@ -48,6 +50,13 @@ function Shell() {
   const [inspect, setInspect] = useState<Inspect | null>(null);
   const [speed, setSpeed] = useState(16);
   const [building, setBuilding] = useState<InteriorInfo | null>(null);
+  // `?demo=1` memulai mode demo langsung (untuk rekaman video).
+  const [demo, setDemo] = useState(false);
+  const stopDemo = useCallback(() => setDemo(false), []);
+  const beforeDemo = useCallback(() => { setSheet(null); setPickedId(PREVIEW_CITIES[0].id); }, []);
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("demo")) queueMicrotask(() => setDemo(true));
+  }, []);
   useCityActivity(current.vault, useCallback((e) => sceneApi.current?.emit(e), []));
   const tvl = current.totalAssets;
   useEffect(() => {
@@ -56,7 +65,7 @@ function Shell() {
   }, [tvl, current.mapId]);
   useEffect(() => {
     // Kota contoh hidup sendiri dengan kejadian contoh, supaya layar pertama tidak kosong.
-    if (!current.preview) return;
+    if (!current.preview || demo) return;
     const script: Parameters<NonNullable<typeof sceneApi.current>["emit"]>[0][] = [
       { type: "transfer", from: "idle", to: "lend", amount: 1200 },
       { type: "deposit", amount: 500 },
@@ -69,7 +78,7 @@ function Shell() {
     const first = window.setTimeout(() => sceneApi.current?.emit(script[i++ % script.length]), 3000);
     const id = window.setInterval(() => sceneApi.current?.emit(script[i++ % script.length]), 11000);
     return () => { window.clearTimeout(first); window.clearInterval(id); };
-  }, [current.preview, current.id]);
+  }, [current.preview, current.id, demo]);
 
   const { style, code: styleCode, save: saveStyle, sync: styleSync, error: styleError } = useCityStyle(current.vault ?? current.id, current.preview ? undefined : current.vault, wallet);
 
@@ -86,7 +95,8 @@ function Shell() {
 
       {/* Tengah: KPI di kiri, panel kota di kanan. Posisinya tetap; sheet di bawah tidak menekannya. */}
       <div className="pointer-events-none absolute inset-x-3 bottom-24 top-[4.75rem] flex justify-between gap-3 sm:inset-x-4 sm:top-[5.25rem]">
-        <div className="min-w-0 flex-1"><KpiRow city={current} /></div>
+        {/* Di ponsel KPI disembunyikan saat lembar atau panel terbuka, supaya tidak bertumpuk. */}
+        <div className={`min-w-0 flex-1 ${sheet || mobilePanel || building ? "max-sm:hidden" : ""}`}><KpiRow city={current} /></div>
         <div className="hidden max-h-full min-h-0 md:block"><CityPanel city={current} selectedId={districtId} onSelect={setDistrictId} me={wallet.address} /></div>
       </div>
 
@@ -103,12 +113,14 @@ function Shell() {
         <div className="pointer-events-none fixed left-3 top-[10.5rem] sm:left-4"><BuildingCard info={building} onClose={() => api?.closeBuilding()} onFloor={(l) => api?.focusFloor(l)} /></div>
         <div className="pointer-events-none fixed bottom-24 left-1/2 -translate-x-1/2"><InspectCard info={inspect} onClose={() => { api?.clearInspect(); setInspect(null); }} /></div>
         <div className="hidden flex-col items-end gap-2 sm:flex">
-          <LifeClock tick={tick} api={api} speed={speed} onSpeed={setSpeed} />
+          <LifeClock tick={tick} api={api} speed={speed} onSpeed={setSpeed} onDemo={() => setDemo(true)} />
         <div className="pointer-events-auto max-w-[260px] text-right text-[10px] leading-snug text-ink-soft/80">
           Map data © OpenStreetMap contributors · Overture Maps Foundation. Testnet only; no real money.
         </div>
         </div>
       </div>
+      <DemoDirector api={api} running={demo} onStop={stopDemo} onBefore={beforeDemo} />
+      {!demo && <IntroTour onDemo={() => setDemo(true)} onExplore={() => open("explore")} />}
     </main>
   );
 }

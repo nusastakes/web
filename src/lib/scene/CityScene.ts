@@ -893,6 +893,9 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     this.focusOn(s.x, s.z, this.buildingDist, 1.3, s.y);
   }
 
+  /** Membuka balai kota (untuk tur dan mode demo). */
+  openTownHall() { if (this.hallId >= 0) this.openBuilding(this.hallId); }
+
   closeBuilding() {
     if (!this.interior) return;
     this.interior.dispose();
