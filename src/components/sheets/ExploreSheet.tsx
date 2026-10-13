@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { MAYOR } from "@/lib/copy-mayor";
 import { fmtAusd, shortAddr } from "@/lib/format";
+import { useLang } from "@/lib/lang";
 import { getEconomy, getLeaderboard, getMetrics, type LeaderRow } from "@/lib/relayer";
 import type { Hex } from "@/lib/types";
 import { Badge, Notice, Sheet, Spinner, cx } from "../ui";
@@ -22,6 +24,9 @@ const usd = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? 
 const HIDDEN = /\(ignore\)/i;
 
 export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => void; onPick: (vault: string) => void; me?: Hex }) {
+  const [lang] = useLang();
+  const t = MAYOR[lang].exp;
+  const loc = MAYOR[lang].locale;
   const [tab, setTab] = useState<"rank" | "economy">("rank");
   const [rows, setRows] = useState<LeaderRow[] | null>(null);
   const [minTvl, setMinTvl] = useState<string>("0");
@@ -44,13 +49,13 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
   const list = community ? visible.filter((r) => r.community === community) : visible;
 
   return (
-    <Sheet title="Explore cities" subtitle="Ranked by residents' return since founding, from on-chain events." onClose={onClose}>
+    <Sheet title={t.title} subtitle={t.sub} onClose={onClose}>
       <div className="space-y-3">
         <div className="flex gap-1 rounded-xl bg-slate-900/5 p-1" role="tablist">
           {(["rank", "economy"] as const).map((k) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={cx("flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold", tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft")}>
-              {k === "rank" ? "Leaderboard" : "Monad economy"}
+              {k === "rank" ? t.tabRank : t.tabEco}
             </button>
           ))}
         </div>
@@ -59,29 +64,29 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
           <>
             {metrics && (
               <div className="grid grid-cols-4 gap-1.5 text-center text-[10.5px] text-ink-soft">
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.cities}</b>cities</div>
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.mayors}</b>mayors</div>
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.residents}</b>residents</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.cities}</b>{t.cities}</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.mayors}</b>{t.mayors}</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{metrics.residents}</b>{t.residents}</div>
                 <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{fmtAusd(Number(metrics.tvl) / 1e6)}</b>AUSD</div>
               </div>
             )}
             {communities.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                <button onClick={() => setCommunity("")} className={cx("rounded-full px-2.5 py-1 text-[11px] font-semibold", !community ? "bg-accent text-white" : "bg-slate-900/5 text-ink")}>All communities</button>
+                <button onClick={() => setCommunity("")} className={cx("rounded-full px-2.5 py-1 text-[11px] font-semibold", !community ? "bg-accent text-white" : "bg-slate-900/5 text-ink")}>{t.allCommunities}</button>
                 {communities.map((c) => (
                   <button key={c} onClick={() => setCommunity(c)} className={cx("rounded-full px-2.5 py-1 text-[11px] font-semibold", community === c ? "bg-accent text-white" : "bg-slate-900/5 text-ink")}>{c}</button>
                 ))}
               </div>
             )}
-            {!rows && !error && <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> Reading the city index…</div>}
+            {!rows && !error && <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> {t.reading}</div>}
             <ol className="space-y-1.5">
               {list.map((r) => (
                 <li key={r.vault}>
                   <button onClick={() => { onPick(r.vault); onClose(); }} className="flex w-full items-center gap-2.5 rounded-xl border border-slate-900/5 bg-white/70 px-2.5 py-2 text-left hover:bg-white">
                     <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold", r.ranked ? "bg-accent-soft text-accent" : "bg-slate-900/5 text-ink-soft")}>{r.ranked ? r.rank : "–"}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-ink">{r.name}{me && r.mayor.toLowerCase() === me.toLowerCase() ? " · yours" : ""}</span>
-                      <span className="block truncate text-[11px] text-ink-soft">{r.community || "No community"} · mayor {shortAddr(r.mayor)} · {r.residents} resident{r.residents === 1 ? "" : "s"}</span>
+                      <span className="block truncate text-sm font-semibold text-ink">{r.name}{me && r.mayor.toLowerCase() === me.toLowerCase() ? t.yours : ""}</span>
+                      <span className="block truncate text-[11px] text-ink-soft">{r.community || t.noCommunity} · {t.mayor} {shortAddr(r.mayor)} · {t.resident(r.residents)}</span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className={cx("block text-xs font-semibold", r.returnBps > 0 ? "text-good" : r.returnBps < 0 ? "text-bad" : "text-ink")}>{(r.returnBps / 100).toFixed(2)}%</span>
@@ -91,18 +96,18 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
                 </li>
               ))}
             </ol>
-            {rows && list.length === 0 && <Notice tone="info">No cities in this community yet.</Notice>}
-            <p className="text-[10.5px] text-ink-soft/80">Cities with less than {fmtAusd(Number(minTvl) / 1e6)} AUSD are listed but not ranked. Return is the change in share price since founding; yield on testnet is simulated.</p>
+            {rows && list.length === 0 && <Notice tone="info">{t.none}</Notice>}
+            <p className="text-[10.5px] text-ink-soft/80">{t.footnote(fmtAusd(Number(minTvl) / 1e6))}</p>
           </>
         )}
 
         {tab === "economy" && (
-          !eco ? <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> Reading DefiLlama…</div> : (
+          !eco ? <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> {t.readingEco}</div> : (
             <>
               <div className="grid grid-cols-3 gap-1.5 text-center text-[10.5px] text-ink-soft">
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees24h)}</b>fees 24h</div>
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees7d)}</b>fees 7d</div>
-                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees30d)}</b>fees 30d</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees24h)}</b>{t.fees24}</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees7d)}</b>{t.fees7}</div>
+                <div className="rounded-lg bg-slate-900/[0.04] p-1.5"><b className="block text-sm text-ink">{usd(eco.totals.fees30d)}</b>{t.fees30}</div>
               </div>
               <ul className="space-y-1.5">
                 {eco.sectors.slice(0, 8).map((s) => (
@@ -114,14 +119,14 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-900/5">
                       <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(2, (s.fees30d / Math.max(1, eco.sectors[0].fees30d)) * 100)}%` }} />
                     </div>
-                    <div className="mt-1 truncate text-[11px] text-ink-soft">{s.protocols} protocols · top: {s.top.slice(0, 3).map((t) => t.name).join(", ")}</div>
+                    <div className="mt-1 truncate text-[11px] text-ink-soft">{t.protocols(s.protocols)} · {t.top}: {s.top.slice(0, 3).map((x) => x.name).join(", ")}</div>
                   </li>
                 ))}
               </ul>
               <p className="text-[10.5px] leading-snug text-ink-soft/80">
-                {eco.note} Source: <a className="text-accent hover:underline" href={eco.sourceUrl} target="_blank" rel="noreferrer">{eco.source}</a>, fetched {new Date(eco.fetchedAt * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.{eco.stale ? " The figures are stale." : ""}
+                {eco.note} {t.source}: <a className="text-accent hover:underline" href={eco.sourceUrl} target="_blank" rel="noreferrer">{eco.source}</a>, {t.fetched} {new Date(eco.fetchedAt * 1000).toLocaleString(loc, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.{eco.stale ? t.stale : ""}
               </p>
-              <Badge tone="neutral">Mainnet data, for the mayor&apos;s decisions</Badge>
+              <Badge tone="neutral">{t.badge}</Badge>
             </>
           )
         )}

@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MAYOR } from "@/lib/copy-mayor";
+import { useLang } from "@/lib/lang";
 import { QUICK_PLACES, buildOsmCity, osmUri, rememberOsmCity, searchPlaces, type PlaceHit } from "@/lib/osm";
 import type { CityMap } from "@/lib/scene/geometry";
 import { Notice, Spinner, cx, inputCls } from "../ui";
 
 /** Memilih area kota asli dari OpenStreetMap: tempat cepat atau pencarian, lalu pratinjau tapak bangunan dan jalan. */
 export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: string | null, label?: string) => void; disabled?: boolean }) {
+  const [lang] = useLang();
+  const t = MAYOR[lang].place;
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<PlaceHit[] | null>(null);
   const [picked, setPicked] = useState<PlaceHit | null>(null);
@@ -69,8 +73,8 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
       </div>
       <div className="flex gap-2">
         <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void search(); } }}
-          placeholder="Search a neighbourhood, e.g. Blok M Jakarta" disabled={disabled} aria-label="Search a place" />
-        <button type="button" className="btn btn-ghost !px-3" onClick={search} disabled={disabled || busy !== null || q.trim().length < 3}>{busy === "search" ? <Spinner /> : "Search"}</button>
+          placeholder={t.search} disabled={disabled} aria-label={t.searchAria} />
+        <button type="button" className="btn btn-ghost !px-3" onClick={search} disabled={disabled || busy !== null || q.trim().length < 3}>{busy === "search" ? <Spinner /> : t.searchBtn}</button>
       </div>
       {hits && hits.length > 0 && !picked && (
         <ul className="max-h-36 space-y-1 overflow-y-auto">
@@ -79,13 +83,13 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
           ))}
         </ul>
       )}
-      {hits && hits.length === 0 && <p className="text-[11px] text-ink-soft">No places found.</p>}
-      {busy === "build" && <div className="flex items-center gap-2 text-xs text-ink-soft"><Spinner /> Fetching buildings and streets from OpenStreetMap…</div>}
+      {hits && hits.length === 0 && <p className="text-[11px] text-ink-soft">{t.none}</p>}
+      {busy === "build" && <div className="flex items-center gap-2 text-xs text-ink-soft"><Spinner /> {t.fetching}</div>}
       {map && (
         <div className="space-y-1">
-          <canvas ref={canvas} width={360} height={220} className="w-full rounded-xl border border-slate-900/10" aria-label="Map preview" />
-          <p className="text-[11px] text-ink-soft">{picked?.name} · {map.buildings.length} buildings, {map.roads.length} streets in about 500 × 500 m. {map.attribution}.</p>
-          <button type="button" className="text-[11px] font-semibold text-accent hover:underline" onClick={() => { setPicked(null); setMap(null); onReadyRef.current(null); }}>Choose another place</button>
+          <canvas ref={canvas} width={360} height={220} className="w-full rounded-xl border border-slate-900/10" aria-label={t.previewAria} />
+          <p className="text-[11px] text-ink-soft">{t.info(picked?.name ?? "", map.buildings.length, map.roads.length)} {map.attribution}.</p>
+          <button type="button" className="text-[11px] font-semibold text-accent hover:underline" onClick={() => { setPicked(null); setMap(null); onReadyRef.current(null); }}>{t.another}</button>
         </div>
       )}
       {error && <Notice tone="warn">{error}</Notice>}

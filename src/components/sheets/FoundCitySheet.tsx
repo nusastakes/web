@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { FOUND_STEPS, estimateFoundCost, foundCityFlow, type Step } from "@/lib/actions";
 import { MAP_PRESETS } from "@/lib/config";
+import { MAYOR } from "@/lib/copy-mayor";
 import { humanError } from "@/lib/errors";
 import { fmtBps } from "@/lib/format";
 import { emitChange, useBalances } from "@/lib/hooks";
+import { useLang } from "@/lib/lang";
 import { requestGas } from "@/lib/relayer";
 import type { Hex } from "@/lib/types";
 import { useWallet } from "@/lib/wallet";
@@ -21,6 +23,8 @@ const FAUCET = "https://faucet.monad.xyz";
 
 export default function FoundCitySheet({ onClose, onFounded }: Props) {
   const w = useWallet();
+  const [lang] = useLang();
+  const t = MAYOR[lang].found;
   const ready = w.status === "ready" && !!w.address;
   const { balances, refresh } = useBalances(ready ? w.address : undefined);
   const [name, setName] = useState("");
@@ -45,7 +49,7 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
   const lowGas = ready && balances !== undefined && need !== null && balances.mon < need;
   const mon = (v: bigint) => (Number(v) / 1e18).toFixed(2);
   const chosenMap = source === "real" ? realMap : mapId;
-  const problem = name.trim().length < 3 ? "Give the city a name (3+ letters)." : !chosenMap ? "Pick a real place first." : lowGas ? "You need more testnet MON first." : null;
+  const problem = name.trim().length < 3 ? t.pName : !chosenMap ? t.pPlace : lowGas ? t.pGas : null;
 
   const getGas = async () => {
     if (!w.address) return;
@@ -70,18 +74,18 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
   const busy = steps?.some((s) => s.state === "active") ?? false;
 
   return (
-    <Sheet title="Found a city" subtitle="You become the mayor. You choose the fee; the contract keeps your hands off the funds." onClose={onClose}>
+    <Sheet title={t.title} subtitle={t.sub} onClose={onClose}>
       {!ready ? <NeedAccount /> : (
         <div className="space-y-3">
-          <Field label="City name"><input className={inputCls} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kota Jogja" disabled={busy} /></Field>
-          <Field label="Community (optional)"><input className={inputCls} value={community} maxLength={40} onChange={(e) => setCommunity(e.target.value)} placeholder="e.g. Web3 Jogja" disabled={busy} /></Field>
+          <Field label={t.name}><input className={inputCls} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder={t.namePh} disabled={busy} /></Field>
+          <Field label={t.community}><input className={inputCls} value={community} maxLength={40} onChange={(e) => setCommunity(e.target.value)} placeholder={t.communityPh} disabled={busy} /></Field>
           {/* Bukan <Field>: isinya berisi tombol dan kanvas, dan <label> akan meneruskan klik ke tombol pertama. */}
           <div>
-            <span className="mb-1 block text-xs font-medium text-ink-soft">Where is your city?</span>
+            <span className="mb-1 block text-xs font-medium text-ink-soft">{t.where}</span>
             <div className="mb-1.5 flex gap-1 rounded-xl bg-slate-900/5 p-1">
               {(["preset", "real"] as const).map((k) => (
                 <button key={k} type="button" onClick={() => setSource(k)} disabled={busy}
-                  className={`flex-1 rounded-lg px-2 py-1 text-xs font-semibold ${source === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>{k === "preset" ? "Ready-made map" : "A real place (OpenStreetMap)"}</button>
+                  className={`flex-1 rounded-lg px-2 py-1 text-xs font-semibold ${source === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>{k === "preset" ? t.preset : t.real}</button>
               ))}
             </div>
             {source === "real" ? <PlacePicker disabled={busy} onReady={(id) => setRealMap(id)} /> : (
@@ -90,27 +94,27 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
             </select>
             )}
           </div>
-          <Field label="Your fee on profit" hint={<span className="font-semibold text-ink">{fmtBps(feeBps)}</span>}>
+          <Field label={t.fee} hint={<span className="font-semibold text-ink">{fmtBps(feeBps)}</span>}>
             <input type="range" min={0} max={2000} step={50} value={feeBps} onChange={(e) => setFeeBps(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" />
           </Field>
-          <p className="text-[11px] leading-relaxed text-ink-soft">You earn this share of the residents&apos; profit, only when they profit. 10% of your fee goes to the platform.</p>
+          <p className="text-[11px] leading-relaxed text-ink-soft">{t.feeNote}</p>
 
           {lowGas && (
             <Notice tone="info">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <span>Founding a city needs about <strong>{mon(need!)} MON</strong> for gas. You have {mon(balances!.mon)}.</span>
-                  <button className="btn btn-primary !px-3 !py-1.5 text-xs" onClick={getGas} disabled={gasBusy}>{gasBusy ? <Spinner /> : null} Get gas</button>
+                  <span>{t.gas(mon(need!), mon(balances!.mon))[0]}<strong>{t.gas(mon(need!), mon(balances!.mon))[1]}</strong>{t.gas(mon(need!), mon(balances!.mon))[2]}</span>
+                  <button className="btn btn-primary !px-3 !py-1.5 text-xs" onClick={getGas} disabled={gasBusy}>{gasBusy ? <Spinner /> : null} {t.getGas}</button>
                 </div>
-                <a className="font-medium text-accent hover:underline" href={FAUCET} target="_blank" rel="noreferrer">Need more? Open the Monad faucet</a>
+                <a className="font-medium text-accent hover:underline" href={FAUCET} target="_blank" rel="noreferrer">{t.faucetMore}</a>
               </div>
             </Notice>
           )}
           {steps && <StepList steps={steps} />}
           {error && <Notice tone="error">{error}</Notice>}
-          {founded && <Notice tone="good">Your city is live. You can see it in the city list.</Notice>}
+          {founded && <Notice tone="good">{t.live}</Notice>}
           <button className="btn btn-primary w-full" disabled={busy || !!problem || founded} onClick={submit}>
-            {busy ? <Spinner /> : <IconPlus />} {busy ? "Working…" : problem ?? "Found city"}
+            {busy ? <Spinner /> : <IconPlus />} {busy ? t.working : problem ?? t.btn}
           </button>
         </div>
       )}

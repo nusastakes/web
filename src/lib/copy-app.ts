@@ -171,3 +171,9 @@ const ID: typeof EN = {
 };
 
 export const APP: Record<Lang, typeof EN> = { en: EN, id: ID };
+
+/** Nama distrik menurut bahasa untuk distrik bawaan (alun-alun, pinjaman, brankas); distrik lain memakai labelnya sendiri. */
+export function districtName(lang: Lang, d: { kind: string; label: string }): string {
+  if (lang === "en") return d.label;
+  return d.kind === "idle" ? "Alun-alun" : d.kind === "lending" ? "Distrik pinjaman" : d.kind === "vault" ? "Distrik brankas" : d.label;
+}

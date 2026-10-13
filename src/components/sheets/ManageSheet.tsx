@@ -7,9 +7,11 @@ import StaffPanel from "./StaffPanel";
 import { DEFAULT_STYLE, THEMES, THEME_IDS, WORKS, developmentOf, fundsForDevelopment, type CityStyle, type WorkId } from "@/lib/scene/themes";
 import { REBALANCE_STEPS, DEPUTY_STEPS, TX_STEPS, contractTx, planHashOf, rebalanceFlow, setDeputyFlow, type Slot, type Step } from "@/lib/actions";
 import { vaultAbi } from "@/lib/abis";
+import { MAYOR } from "@/lib/copy-mayor";
 import { humanError } from "@/lib/errors";
 import { fmtAusd, fmtBps } from "@/lib/format";
 import { emitChange, useBalances, useMayorState } from "@/lib/hooks";
+import { useLang } from "@/lib/lang";
 import { requestGas } from "@/lib/relayer";
 import type { CityView, Hex } from "@/lib/types";
 import { useWallet } from "@/lib/wallet";
@@ -38,6 +40,10 @@ const ausd = (raw: bigint) => fmtAusd(Number(raw) / 1e6);
 
 export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STYLE, styleCode = "", onStyle, styleSync = "local", styleError }: Props) {
   const w = useWallet();
+  const [lang] = useLang();
+  const t = MAYOR[lang].manage;
+  // Nama distrik bawaan ikut bahasa; yang tersimpan di buku strategi tetap label aslinya.
+  const slotName = (label: string) => (lang === "id" ? ({ Plaza: "Alun-alun", "Lending district": "Distrik pinjaman", "Vault district": "Distrik brankas" } as Record<string, string>)[label] ?? label : label);
   const ready = w.status === "ready" && !!w.address;
   const isMayor = ready && !!city.mayor && city.mayor.toLowerCase() === w.address!.toLowerCase();
   const { state, refresh } = useMayorState(isMayor ? city.vault : undefined, city.districts);
@@ -68,7 +74,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const limitBps = state ? (deputyActive ? Math.min(state.maxShiftBps, state.deputy!.maxShiftBps) : state.maxShiftBps) : 0;
   const cap = from && state ? (() => { const m = (state.total * BigInt(limitBps)) / 10_000n; return from.assets < m ? from.assets : m; })() : 0n;
   const amount = (cap * BigInt(permille)) / 1000n;
-  const problem = !from || !to ? "This city has nowhere to move funds yet." : from.assets === 0n ? "There is nothing to move yet." : amount <= 0n ? "Pick an amount to move." : null;
+  const problem = !from || !to ? t.pNowhere : from.assets === 0n ? t.pNothing : amount <= 0n ? t.pAmount : null;
 
   const reportR = (id: string, patch: Partial<Step>) => setSteps((s) => (s ?? REBALANCE_STEPS).map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const reportD = (id: string, patch: Partial<Step>) => setDeputySteps((s) => (s ?? DEPUTY_STEPS).map((x) => (x.id === id ? { ...x, ...patch } : x)));
@@ -95,7 +101,7 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
         wallet: w, useDeputy: deputyActive, report: reportR,
         input: { vault: city.vault, owner: w.address, from: from.address, to: to.address, amount, planHash },
       });
-      setDone(`Moved ${ausd(amount)} AUSD from ${from.label} to ${to.label}.`);
+      setDone(t.moved(ausd(amount), slotName(from.label), slotName(to.label)));
       setNote("");
       emitChange();
       await Promise.all([refresh(), refreshBalances()]);
@@ -138,21 +144,21 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   };
 
   const busy = (steps?.some((s) => s.state === "active") ?? false) || (deputySteps?.some((s) => s.state === "active") ?? false);
-  const expiry = state?.deputy ? new Date(state.deputy.expiry * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  const expiry = state?.deputy ? new Date(state.deputy.expiry * 1000).toLocaleString(MAYOR[lang].locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <Sheet title={`City hall · ${city.name}`} subtitle="Run your city: move funds, keep a sealed strategy book, hire AI staff, and design the city. The contract never lets you send funds to your own wallet." onClose={onClose}>
-      {city.preview || !city.vault ? <Notice tone="warn">This is a preview city. Found your own city to manage it.</Notice>
+    <Sheet title={t.title(city.name)} subtitle={t.sub} onClose={onClose}>
+      {city.preview || !city.vault ? <Notice tone="warn">{t.preview}</Notice>
         : !ready ? <NeedAccount />
-        : !isMayor ? <Notice tone="info">Only the mayor of this city can manage it. Found your own city from the dock.</Notice>
-        : !state ? <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> Reading the city…</div>
+        : !isMayor ? <Notice tone="info">{t.notMayor}</Notice>
+        : !state ? <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> {t.reading}</div>
         : (
           <div className="space-y-4">
             <div className="flex gap-1 rounded-xl bg-slate-900/5 p-1" role="tablist">
               {(["funds", "book", "staff", "design"] as const).map((k) => (
                 <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold capitalize ${tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>
-                  {k === "book" ? "Strategy book" : k === "staff" ? "AI staff" : k}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold ${tab === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>
+                  {t.tabs[k]}
                 </button>
               ))}
             </div>
@@ -161,82 +167,82 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
             {tab === "funds" && <>
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Move funds</h3>
-                <Badge tone={deputyActive ? "good" : "neutral"}>{deputyActive ? "Deputy key · no prompt" : "Passkey · prompt"}</Badge>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{t.moveFunds}</h3>
+                <Badge tone={deputyActive ? "good" : "neutral"}>{deputyActive ? t.badgeDeputy : t.badgePasskey}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="From">
+                <Field label={t.from}>
                   <select className={inputCls} value={from?.id ?? ""} onChange={(e) => setFromId(e.target.value)} disabled={busy}>
-                    {slots.map((s) => <option key={s.id} value={s.id}>{s.label} · {ausd(s.assets)}</option>)}
+                    {slots.map((s) => <option key={s.id} value={s.id}>{slotName(s.label)} · {ausd(s.assets)}</option>)}
                   </select>
                 </Field>
-                <Field label="To">
+                <Field label={t.to}>
                   <select className={inputCls} value={to?.id ?? ""} onChange={(e) => setToId(e.target.value)} disabled={busy}>
-                    {slots.filter((s) => s.id !== from?.id).map((s) => <option key={s.id} value={s.id}>{s.label} · {ausd(s.assets)}</option>)}
+                    {slots.filter((s) => s.id !== from?.id).map((s) => <option key={s.id} value={s.id}>{slotName(s.label)} · {ausd(s.assets)}</option>)}
                   </select>
                 </Field>
               </div>
-              <Field label="Amount" hint={<span className="font-semibold text-ink">{ausd(amount)} AUSD</span>}>
-                <input type="range" min={0} max={1000} step={10} value={permille} onChange={(e) => setPermille(Number(e.target.value))} disabled={busy || cap === 0n} className="w-full accent-[var(--accent)]" aria-label="Amount to move" />
+              <Field label={t.amount} hint={<span className="font-semibold text-ink">{ausd(amount)} AUSD</span>}>
+                <input type="range" min={0} max={1000} step={10} value={permille} onChange={(e) => setPermille(Number(e.target.value))} disabled={busy || cap === 0n} className="w-full accent-[var(--accent)]" aria-label={t.amountAria} />
               </Field>
-              <p className="text-[11px] leading-relaxed text-ink-soft">One change can move at most {fmtBps(limitBps)} of the city ({ausd(cap)} AUSD from here).</p>
-              <Field label="Your reasoning (optional)">
-                <textarea className={`${inputCls} min-h-[60px] resize-none`} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} placeholder="Why this move? Write it before the result is known." disabled={busy} />
+              <p className="text-[11px] leading-relaxed text-ink-soft">{t.limit(fmtBps(limitBps), ausd(cap))}</p>
+              <Field label={t.reason}>
+                <textarea className={`${inputCls} min-h-[60px] resize-none`} value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} placeholder={t.reasonPh} disabled={busy} />
               </Field>
               <label className="flex items-start gap-2 text-[11px] leading-snug text-ink-soft">
                 <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={seal} onChange={(e) => setSeal(e.target.checked)} disabled={busy} />
-                <span><b className="text-ink">Seal it in your strategy book.</b> Encrypted on this device with a key from your passkey; only its fingerprint goes on-chain. You can reveal it at the end of the season to prove you called it in advance.</span>
+                <span><b className="text-ink">{t.sealIt[0]}</b>{t.sealIt[1]}</span>
               </label>
               {lowGas && (
                 <Notice tone="info">
                   <div className="flex items-center justify-between gap-3">
-                    <span>The {deputyActive ? "deputy key" : "account"} needs a little MON for gas ({(Number(balances!.mon) / 1e18).toFixed(2)} MON now).</span>
-                    <button className="btn btn-primary !px-3 !py-1.5 text-xs" onClick={getGas} disabled={gasBusy}>{gasBusy ? <Spinner /> : null} Get gas</button>
+                    <span>{t.lowGas(deputyActive, (Number(balances!.mon) / 1e18).toFixed(2))}</span>
+                    <button className="btn btn-primary !px-3 !py-1.5 text-xs" onClick={getGas} disabled={gasBusy}>{gasBusy ? <Spinner /> : null} {t.getGas}</button>
                   </div>
                 </Notice>
               )}
               {steps && <StepList steps={steps} />}
               {done && <Notice tone="good">{done}</Notice>}
               <button className="btn btn-primary w-full" disabled={busy || !!problem || lowGas} onClick={move}>
-                {busy ? <Spinner /> : <IconSwap />} {busy ? "Working…" : problem ?? "Move funds"}
+                {busy ? <Spinner /> : <IconSwap />} {busy ? t.working : problem ?? t.moveFunds}
               </button>
             </section>
 
             <section className="space-y-2 border-t border-slate-900/5 pt-3">
-              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft"><IconKey width={14} height={14} /> Deputy key</h3>
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft"><IconKey width={14} height={14} /> {t.deputyHdr}</h3>
               {state.deputy ? (
                 <p className="text-xs leading-relaxed text-ink-soft">
-                  Active until {expiry}, up to {fmtBps(state.deputy.maxShiftBps)} per change. It can only move funds between districts, never withdraw them.
-                  {!deputyActive && " This browser session holds a different deputy key, so changes here use your passkey."}
+                  {t.deputyActive(expiry, fmtBps(state.deputy.maxShiftBps))}
+                  {!deputyActive && t.deputyOther}
                 </p>
               ) : (
-                <p className="text-xs leading-relaxed text-ink-soft">Register a second key so day-to-day changes need no prompt. It can only move funds between districts (up to {fmtBps(DEPUTY_SHIFT_BPS)} per change, for 24 hours) and can never withdraw.</p>
+                <p className="text-xs leading-relaxed text-ink-soft">{t.deputyNone(fmtBps(DEPUTY_SHIFT_BPS))}</p>
               )}
               {deputySteps && <StepList steps={deputySteps} />}
               <div className="flex gap-2">
-                <button className="btn btn-ghost flex-1" disabled={busy} onClick={() => setDeputy(true)}>{state.deputy ? "Renew" : "Register deputy key"}</button>
-                {state.deputy && <button className="btn btn-ghost" disabled={busy} onClick={() => setDeputy(false)}>Remove</button>}
+                <button className="btn btn-ghost flex-1" disabled={busy} onClick={() => setDeputy(true)}>{state.deputy ? t.renew : t.register}</button>
+                {state.deputy && <button className="btn btn-ghost" disabled={busy} onClick={() => setDeputy(false)}>{t.remove}</button>}
               </div>
             </section>
             <section className="space-y-2 border-t border-slate-900/5 pt-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">City rules</h3>
-              <Field label="Your fee on profit" hint={<span className="font-semibold text-ink">{fmtBps(feeDraft ?? city.feeBps)}</span>}>
-                <input type="range" min={0} max={2000} step={50} value={feeDraft ?? city.feeBps} onChange={(e) => setFeeDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label="Fee on profit" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{t.rules}</h3>
+              <Field label={t.fee} hint={<span className="font-semibold text-ink">{fmtBps(feeDraft ?? city.feeBps)}</span>}>
+                <input type="range" min={0} max={2000} step={50} value={feeDraft ?? city.feeBps} onChange={(e) => setFeeDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label={t.feeAria} />
               </Field>
-              <Field label="Most one change may move" hint={<span className="font-semibold text-ink">{fmtBps(shiftDraft ?? state.maxShiftBps)}</span>}>
-                <input type="range" min={500} max={10000} step={500} value={shiftDraft ?? state.maxShiftBps} onChange={(e) => setShiftDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label="Largest share of the city one change may move" />
+              <Field label={t.maxMove} hint={<span className="font-semibold text-ink">{fmtBps(shiftDraft ?? state.maxShiftBps)}</span>}>
+                <input type="range" min={500} max={10000} step={500} value={shiftDraft ?? state.maxShiftBps} onChange={(e) => setShiftDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label={t.maxMoveAria} />
               </Field>
-              <p className="text-[11px] leading-relaxed text-ink-soft">The fee is taken only from profit above the city&apos;s best share price. Pending fees are settled at the old rate first. Each change needs your passkey.</p>
+              <p className="text-[11px] leading-relaxed text-ink-soft">{t.rulesNote}</p>
               {ruleSteps && <StepList steps={ruleSteps} />}
               <div className="flex gap-2">
-                <button className="btn btn-ghost flex-1" disabled={busy || feeDraft === null || feeDraft === city.feeBps} onClick={() => saveRule("fee")}>Save fee</button>
-                <button className="btn btn-ghost flex-1" disabled={busy || shiftDraft === null || shiftDraft === state.maxShiftBps} onClick={() => saveRule("shift")}>Save limit</button>
+                <button className="btn btn-ghost flex-1" disabled={busy || feeDraft === null || feeDraft === city.feeBps} onClick={() => saveRule("fee")}>{t.saveFee}</button>
+                <button className="btn btn-ghost flex-1" disabled={busy || shiftDraft === null || shiftDraft === state.maxShiftBps} onClick={() => saveRule("shift")}>{t.saveLimit}</button>
               </div>
             </section>
             </>}
             {tab === "design" && <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">City design</h3>
-              <p className="text-xs leading-relaxed text-ink-soft">Make your city beautiful. This is looks only: it never changes residents&apos; money. Bigger cities unlock more civic works.</p>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{t.design}</h3>
+              <p className="text-xs leading-relaxed text-ink-soft">{t.designNote}</p>
               <div className="flex flex-wrap gap-1.5">
                 {THEME_IDS.map((id) => (
                   <button key={id} onClick={() => onStyle?.({ ...style, theme: id })} aria-pressed={style.theme === id}
@@ -254,15 +260,15 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
                       <label className={`flex items-start gap-2 text-xs ${open ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
                         <input type="checkbox" className="mt-0.5 accent-[var(--accent)]" checked={on} disabled={!open}
                           onChange={(e) => onStyle?.({ ...style, works: e.target.checked ? [...style.works, w.id] : style.works.filter((x) => x !== w.id) })} />
-                        <span><b className="font-semibold text-ink">{w.label}</b><br /><span className="text-ink-soft">{open ? w.blurb : `Unlocks at about ${fundsForDevelopment(w.unlockAt).toLocaleString("en-US")} AUSD in the city`}</span></span>
+                        <span><b className="font-semibold text-ink">{w.label}</b><br /><span className="text-ink-soft">{open ? w.blurb : t.unlocksAt(fundsForDevelopment(w.unlockAt).toLocaleString("en-US"))}</span></span>
                       </label>
                     </li>
                   );
                 })}
               </ul>
               <p className="text-[11px] text-ink-soft">
-                {styleSync === "shared" ? "Saved for everyone: residents see this look when they open the city." : styleSync === "saving" ? "Saving for everyone…" : styleSync === "error" ? `Saved in this browser only (${styleError ?? "relayer error"}).` : "Saved in this browser."}
-                {styleCode && <> Preview link: <code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code></>}
+                {styleSync === "shared" ? t.styleShared : styleSync === "saving" ? t.styleSaving : styleSync === "error" ? t.styleErr(styleError ?? t.relayerError) : t.styleLocal}
+                {styleCode && <>{t.previewLink}<code className="rounded bg-slate-900/5 px-1">?style={styleCode}</code></>}
               </p>
             </section>}
             {error && <Notice tone="error">{error}</Notice>}

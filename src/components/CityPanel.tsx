@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { getReport } from "@/lib/relayer";
-import { APP } from "@/lib/copy-app";
+import { APP, districtName } from "@/lib/copy-app";
 import { useLang } from "@/lib/lang";
 import { useNowSeconds } from "@/lib/hooks";
 import { addressUrl } from "@/lib/config";
@@ -26,7 +26,7 @@ function Row({ d, active, onClick }: { d: District; active: boolean; onClick: ()
     <button onClick={onClick} className={cx("flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition", active ? "bg-accent-soft" : "hover:bg-slate-900/5")}>
       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: DISTRICT_COLORS[d.kind] }} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-ink">{d.label}</span>
+        <span className="block truncate text-sm font-medium text-ink">{districtName(lang, d)}</span>
         <span className="block truncate text-[11px] text-ink-soft">{d.protocol ?? (d.kind === "idle" ? t.notPlaced : "")}</span>
       </span>
       <span className="shrink-0 text-right">
@@ -95,7 +95,7 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
         </div>
         <div className="mx-1 mb-2 flex h-2.5 overflow-hidden rounded-full bg-slate-900/5">
           {city.districts.filter((d) => d.weight > 0).map((d) => (
-            <button key={d.id} aria-label={d.label} onClick={() => onSelect(d.id)} className="h-full transition-opacity hover:opacity-80"
+            <button key={d.id} aria-label={districtName(lang, d)} onClick={() => onSelect(d.id)} className="h-full transition-opacity hover:opacity-80"
               style={{ width: `${d.weight * 100}%`, background: DISTRICT_COLORS[d.kind], opacity: selected && selected.id !== d.id ? 0.35 : 1 }} />
           ))}
         </div>
@@ -106,7 +106,7 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
         {selected && (
           <div className="mt-3 space-y-2 rounded-xl bg-slate-900/[0.04] p-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-ink">{selected.label}</span>
+              <span className="text-sm font-semibold text-ink">{districtName(lang, selected)}</span>
               {selected.simulated ? <Badge tone="warn">{t.simulated}</Badge> : selected.kind === "idle" ? <Badge>{t.idle}</Badge> : <Badge tone="good">{t.liveProto}</Badge>}
             </div>
             <dl className="grid grid-cols-3 gap-2 text-center">

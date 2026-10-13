@@ -5,8 +5,10 @@ import { readAll, type OpenedEntry } from "@/lib/book";
 import { TX_STEPS, contractTx, type Step } from "@/lib/actions";
 import { vaultAbi } from "@/lib/abis";
 import { txUrl } from "@/lib/config";
+import { MAYOR } from "@/lib/copy-mayor";
 import { humanError } from "@/lib/errors";
 import { emitChange } from "@/lib/hooks";
+import { useLang } from "@/lib/lang";
 import type { CityView, Hex } from "@/lib/types";
 import { useWallet } from "@/lib/wallet";
 import { IconExternal, IconLock } from "../icons";
@@ -19,6 +21,8 @@ import { Badge, Notice, Spinner } from "../ui";
  */
 export default function BookPanel({ city }: { city: CityView }) {
   const w = useWallet();
+  const [lang] = useLang();
+  const t = MAYOR[lang].book;
   const [entries, setEntries] = useState<OpenedEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,22 +55,21 @@ export default function BookPanel({ city }: { city: CityView }) {
   return (
     <section className="space-y-3">
       <p className="text-xs leading-relaxed text-ink-soft">
-        Each plan you write when moving funds is encrypted on this device with a key that only your passkey can recreate, on any device.
-        The relayer keeps the ciphertext; the chain keeps its fingerprint. Reveal one entry at the end of the season and anyone can check you wrote it before the result.
+        {t.intro}
       </p>
       {!entries ? (
         <button className="btn btn-primary w-full" onClick={open} disabled={loading || w.status !== "ready"}>
-          {loading ? <Spinner /> : <IconLock />} {w.bookUnlocked ? "Read my strategy book" : "Unlock my strategy book"}
+          {loading ? <Spinner /> : <IconLock />} {w.bookUnlocked ? t.read : t.unlock}
         </button>
       ) : mine.length === 0 ? (
-        <Notice tone="info">No sealed plans for this city yet. Write your reasoning when you move funds in the Funds tab.</Notice>
+        <Notice tone="info">{t.none}</Notice>
       ) : (
         <ul className="space-y-2">
           {mine.map((e) => (
             <li key={e.id} className="rounded-xl border border-slate-900/5 bg-white/70 p-2.5 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-ink">{new Date(e.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                <Badge tone={e.error ? "warn" : "good"}>{e.error ? "Cannot open" : "Decrypted"}</Badge>
+                <span className="font-semibold text-ink">{new Date(e.createdAt).toLocaleString(MAYOR[lang].locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                <Badge tone={e.error ? "warn" : "good"}>{e.error ? t.cannotOpen : t.decrypted}</Badge>
               </div>
               {e.entry ? (
                 <>
@@ -76,21 +79,21 @@ export default function BookPanel({ city }: { city: CityView }) {
               ) : <div className="mt-1 text-ink-soft">{e.error}</div>}
               <div className="mt-1.5 flex items-center justify-between gap-2">
                 <code className="truncate text-[10px] text-ink-soft">{e.hash.slice(0, 18)}…</code>
-                {e.key && <button className="btn btn-ghost !px-2 !py-1 text-[11px]" disabled={!!reveal && reveal.id === e.id} onClick={() => doReveal(e)}>Reveal publicly</button>}
+                {e.key && <button className="btn btn-ghost !px-2 !py-1 text-[11px]" disabled={!!reveal && reveal.id === e.id} onClick={() => doReveal(e)}>{t.reveal}</button>}
               </div>
               {reveal?.id === e.id && (
                 <div className="mt-2 space-y-1.5">
                   <StepList steps={reveal.steps} />
-                  {reveal.hash && <a className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline" href={txUrl(reveal.hash)} target="_blank" rel="noreferrer">Key is public now <IconExternal width={11} height={11} /></a>}
+                  {reveal.hash && <a className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline" href={txUrl(reveal.hash)} target="_blank" rel="noreferrer">{t.keyPublic} <IconExternal width={11} height={11} /></a>}
                 </div>
               )}
             </li>
           ))}
         </ul>
       )}
-      {entries && others > 0 && <p className="text-[11px] text-ink-soft">{others} more entries belong to your other cities.</p>}
+      {entries && others > 0 && <p className="text-[11px] text-ink-soft">{t.others(others)}</p>}
       {error && <Notice tone="error">{error}</Notice>}
-      <p className="text-[10.5px] text-ink-soft/80">Revealing publishes the key of that entry only. Your other entries stay sealed.</p>
+      <p className="text-[10.5px] text-ink-soft/80">{t.footer}</p>
     </section>
   );
 }

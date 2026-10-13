@@ -102,7 +102,7 @@ export default function DepositSheet({ city, onClose, onDone }: Props) {
           {error && <Notice tone="error">{error}</Notice>}
           {done && (
             <Notice tone="good">
-              {t.deposited}{first && t.firstTx(first.seconds.toFixed(1), first.ceremonies)}
+              {t.deposited}{first && t.firstTx(lang === "id" ? first.seconds.toFixed(1).replace(".", ",") : first.seconds.toFixed(1), first.ceremonies)}
             </Notice>
           )}
 
