@@ -67,6 +67,7 @@ const EN = {
   place: {
     search: "Search a neighbourhood, e.g. Blok M Jakarta", searchAria: "Search a place", searchBtn: "Search", none: "No places found.",
     fetching: "Fetching buildings and streets from OpenStreetMap…", previewAria: "Map preview",
+    stages: { fetch: "Asking OpenStreetMap for this area", shape: (n: number) => `Shaping ${n.toLocaleString("en-US")} streets, buildings and parks`, ready: "Ready: the city will grow here as money arrives" },
     info: (name: string, b: number, r: number, size: number, km2: string) => `${name} · ${b} buildings and ${r} streets in ${size} × ${size} m (${km2} km²).`, another: "Choose another place",
     openMap: "Choose on the map", changeMap: "Change on the map", mapTitle: "Choose your city's area", mapHint: "Drag and zoom the map. The frame in the middle becomes your city.",
     sizeLabel: "Area size", sizes: { small: "Neighbourhood", mid: "District", large: "City centre" } as Record<string, string>,
@@ -150,6 +151,7 @@ const ID: typeof EN = {
   place: {
     search: "Cari kawasan, mis. Blok M Jakarta", searchAria: "Cari tempat", searchBtn: "Cari", none: "Tempat tidak ditemukan.",
     fetching: "Mengambil bangunan dan jalan dari OpenStreetMap…", previewAria: "Pratinjau peta",
+    stages: { fetch: "Meminta data area ini ke OpenStreetMap", shape: (n: number) => `Menyusun ${n.toLocaleString("id-ID")} jalan, bangunan, dan taman`, ready: "Siap: kota akan tumbuh di sini saat dana masuk" },
     info: (name, b, r, size, km2) => `${name} · ${b} bangunan dan ${r} jalan dalam ${size} × ${size} m (${km2} km²).`, another: "Pilih tempat lain",
     openMap: "Pilih di peta", changeMap: "Ubah di peta", mapTitle: "Pilih area kota Anda", mapHint: "Geser dan zoom peta. Kotak di tengah menjadi kota Anda.",
     sizeLabel: "Ukuran area", sizes: { small: "Lingkungan", mid: "Distrik", large: "Pusat kota" },

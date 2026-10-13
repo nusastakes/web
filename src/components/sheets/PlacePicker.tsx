@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MAYOR } from "@/lib/copy-mayor";
 import { useLang } from "@/lib/lang";
-import { DEFAULT_SIZE, QUICK_PLACES, buildOsmCity, densityOf, osmUri, rememberOsmCity } from "@/lib/osm";
+import { DEFAULT_SIZE, QUICK_PLACES, buildOsmCity, densityOf, osmUri, rememberOsmCity, type BuildStage } from "@/lib/osm";
 import type { CityMap } from "@/lib/scene/geometry";
 import { Badge, Notice, Spinner, cx } from "../ui";
 import AreaPickerModal, { type PickedArea } from "./AreaPickerModal";
@@ -21,6 +21,7 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<{ s: BuildStage; n?: number } | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
@@ -29,7 +30,7 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
     setOpen(false); setPicked(a); setMap(null); setError(null); setBusy(true);
     onReadyRef.current(null);
     try {
-      const m = await buildOsmCity(a.lat, a.lon, a.name, a.size);
+      const m = await buildOsmCity(a.lat, a.lon, a.name, a.size, (s, n) => setStage({ s, n }));
       rememberOsmCity(m);
       setMap(m);
       onReadyRef.current(osmUri(a.lat, a.lon, a.size), a.name);
@@ -81,7 +82,21 @@ export default function PlacePicker({ onReady, disabled }: { onReady: (mapId: st
         ))}
       </div>
       <button type="button" className="btn btn-ghost w-full" disabled={disabled || busy} onClick={() => setOpen(true)}>{map ? t.changeMap : t.openMap}</button>
-      {busy && <div className="flex items-center gap-2 text-xs text-ink-soft"><Spinner /> {t.fetching}</div>}
+      {busy && (
+        <ol className="space-y-1 text-xs text-ink-soft">
+          {(["fetch", "shape"] as const).map((k, i) => {
+            const at = stage ? ["fetch", "shape", "ready"].indexOf(stage.s) : 0;
+            const done = at > i;
+            return (
+              <li key={k} className={cx("flex items-center gap-2", at < i && "opacity-40")}>
+                {done ? <span className="w-4 text-center text-good">✓</span> : at === i ? <Spinner /> : <span className="w-4 text-center">·</span>}
+                {k === "fetch" ? t.stages.fetch : t.stages.shape(stage?.n ?? 0)}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {!busy && map && stage?.s === "ready" && <p className="text-[11px] font-medium text-good">✓ {t.stages.ready}</p>}
       {map && density && (
         <div className="space-y-1">
           <canvas ref={canvas} width={360} height={220} className="w-full rounded-xl border border-slate-900/10" aria-label={t.previewAria} />

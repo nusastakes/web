@@ -133,13 +133,20 @@ function simplifyRing(ring: [number, number][], max: number): [number, number][]
   return pts;
 }
 
-/** Mengambil dan menyusun peta kota sekitar (lat, lon), kotak `size` meter. */
-export async function buildOsmCity(lat: number, lon: number, name = "OpenStreetMap area", size = DEFAULT_SIZE): Promise<CityMap> {
+/** Tahap membangun peta kota (B2.21), untuk penanda kemajuan di pemilih area. */
+export type BuildStage = "fetch" | "shape" | "ready";
+
+/** Mengambil dan menyusun peta kota sekitar (lat, lon), kotak `size` meter. `onStage` melaporkan tahapnya. */
+export async function buildOsmCity(lat: number, lon: number, name = "OpenStreetMap area", size = DEFAULT_SIZE, onStage?: (stage: BuildStage, ways?: number) => void): Promise<CityMap> {
+  onStage?.("fetch");
   const HALF = size / 2;
   const kx = 111320 * Math.cos((lat * Math.PI) / 180), kz = 110574;
   const dLat = HALF / kz, dLon = HALF / kx;
   const bbox = `${(lat - dLat).toFixed(6)},${(lon - dLon).toFixed(6)},${(lat + dLat).toFixed(6)},${(lon + dLon).toFixed(6)}`;
   const ways = await overpass(`[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});way["natural"~"^(water|wood|grassland)$"](${bbox});way["waterway"="riverbank"](${bbox});way["leisure"~"^(park|garden|playground|pitch)$"](${bbox});way["landuse"~"^(grass|forest|recreation_ground|meadow)$"](${bbox}););out geom tags;`);
+  onStage?.("shape", ways.length);
+  // Beri peramban satu bingkai untuk menampilkan tahap ini sebelum pengolahan geometri yang sinkron.
+  await new Promise((r) => setTimeout(r, 30));
   const proj = (p: { lat: number; lon: number }): [number, number] => [r1((p.lon - lon) * kx), r1(-(p.lat - lat) * kz)];
 
   const buildings: MapBuilding[] = [];
@@ -210,6 +217,7 @@ export async function buildOsmCity(lat: number, lon: number, name = "OpenStreetM
   }
   const xs = buildings.flatMap((b) => b.p.filter((_, i) => i % 2 === 0));
   const zs = buildings.flatMap((b) => b.p.filter((_, i) => i % 2 === 1));
+  onStage?.("ready");
   return {
     id: osmUri(lat, lon, size), name, attribution: OSM_ATTRIBUTION,
     center: [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5],
