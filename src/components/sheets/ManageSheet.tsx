@@ -5,7 +5,8 @@ import { writeEntry } from "@/lib/book";
 import BookPanel from "./BookPanel";
 import StaffPanel from "./StaffPanel";
 import { DEFAULT_STYLE, THEMES, THEME_IDS, WORKS, developmentOf, fundsForDevelopment, type CityStyle, type WorkId } from "@/lib/scene/themes";
-import { REBALANCE_STEPS, DEPUTY_STEPS, planHashOf, rebalanceFlow, setDeputyFlow, type Slot, type Step } from "@/lib/actions";
+import { REBALANCE_STEPS, DEPUTY_STEPS, TX_STEPS, contractTx, planHashOf, rebalanceFlow, setDeputyFlow, type Slot, type Step } from "@/lib/actions";
+import { vaultAbi } from "@/lib/abis";
 import { humanError } from "@/lib/errors";
 import { fmtAusd, fmtBps } from "@/lib/format";
 import { emitChange, useBalances, useMayorState } from "@/lib/hooks";
@@ -51,6 +52,9 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
   const [gasBusy, setGasBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [seal, setSeal] = useState(true);
+  const [feeDraft, setFeeDraft] = useState<number | null>(null);
+  const [shiftDraft, setShiftDraft] = useState<number | null>(null);
+  const [ruleSteps, setRuleSteps] = useState<Step[] | null>(null);
   const [tab, setTab] = useState<"funds" | "book" | "staff" | "design">("funds");
 
   const deputyActive = !!state?.deputy && !!w.deputy && state.deputy.address.toLowerCase() === w.deputy.toLowerCase();
@@ -108,6 +112,23 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
       emitChange();
       await refresh();
     } catch (e) { setError(humanError(e)); failActive(setDeputySteps); }
+  };
+
+  /** Ubah aturan kota (fee, batas pergeseran): ceremony passkey baru dengan kunci utama (PRD B16). */
+  const saveRule = async (kind: "fee" | "shift") => {
+    if (!city.vault) return;
+    const value = kind === "fee" ? feeDraft : shiftDraft;
+    if (value === null) return;
+    setError(null);
+    setRuleSteps(TX_STEPS(kind === "fee" ? "Fee updated" : "Limit updated"));
+    const report = (id: string, patch: Partial<Step>) => setRuleSteps((s) => s?.map((x) => (x.id === id ? { ...x, ...patch } : x)) ?? null);
+    try {
+      await contractTx(w, { address: city.vault, abi: vaultAbi, functionName: kind === "fee" ? "setFee" : "setMaxShift", args: [value] }, { ceremony: true, label: kind === "fee" ? "Confirm the new fee…" : "Confirm the new limit…", report });
+      emitChange();
+      await refresh();
+      onDone();
+      if (kind === "fee") setFeeDraft(null); else setShiftDraft(null);
+    } catch (e) { setError(humanError(e)); setRuleSteps((s) => s?.map((x) => (x.state === "active" ? { ...x, state: "error" } : x)) ?? null); }
   };
 
   const getGas = async () => {
@@ -195,6 +216,21 @@ export default function ManageSheet({ city, onClose, onDone, style = DEFAULT_STY
               <div className="flex gap-2">
                 <button className="btn btn-ghost flex-1" disabled={busy} onClick={() => setDeputy(true)}>{state.deputy ? "Renew" : "Register deputy key"}</button>
                 {state.deputy && <button className="btn btn-ghost" disabled={busy} onClick={() => setDeputy(false)}>Remove</button>}
+              </div>
+            </section>
+            <section className="space-y-2 border-t border-slate-900/5 pt-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">City rules</h3>
+              <Field label="Your fee on profit" hint={<span className="font-semibold text-ink">{fmtBps(feeDraft ?? city.feeBps)}</span>}>
+                <input type="range" min={0} max={2000} step={50} value={feeDraft ?? city.feeBps} onChange={(e) => setFeeDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label="Fee on profit" />
+              </Field>
+              <Field label="Most one change may move" hint={<span className="font-semibold text-ink">{fmtBps(shiftDraft ?? state.maxShiftBps)}</span>}>
+                <input type="range" min={500} max={10000} step={500} value={shiftDraft ?? state.maxShiftBps} onChange={(e) => setShiftDraft(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" aria-label="Largest share of the city one change may move" />
+              </Field>
+              <p className="text-[11px] leading-relaxed text-ink-soft">The fee is taken only from profit above the city&apos;s best share price. Pending fees are settled at the old rate first. Each change needs your passkey.</p>
+              {ruleSteps && <StepList steps={ruleSteps} />}
+              <div className="flex gap-2">
+                <button className="btn btn-ghost flex-1" disabled={busy || feeDraft === null || feeDraft === city.feeBps} onClick={() => saveRule("fee")}>Save fee</button>
+                <button className="btn btn-ghost flex-1" disabled={busy || shiftDraft === null || shiftDraft === state.maxShiftBps} onClick={() => saveRule("shift")}>Save limit</button>
               </div>
             </section>
             </>}

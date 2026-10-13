@@ -59,6 +59,7 @@ export const getReport = (city: Hex, days = 7) => call<{ text?: string; title?: 
 export interface LeaderRow { rank: number | null; ranked: boolean; vault: Hex; name: string; community: string; mayor: Hex; tvl: string; returnBps: number; pricePerShare: string; residents: number; createdAt: number }
 export const getLeaderboard = () => call<{ asOf: number; minRankedTvl: string; cities: LeaderRow[] }>("/leaderboard");
 export const getEconomy = () => call<Record<string, unknown>>("/economy");
+export const getMetrics = () => call<Record<string, unknown>>("/metrics");
 
 export interface PermitSig { v: number; r: Hex; s: Hex }
 

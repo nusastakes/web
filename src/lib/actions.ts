@@ -109,7 +109,8 @@ export interface FoundCityInput { name: string; community: string; feeBps: numbe
 export async function foundCityFlow(args: { wallet: WalletApi; owner: Hex; input: FoundCityInput; report: Report }): Promise<{ hash: Hex; vault?: Hex }> {
   const { wallet, owner, input, report } = args;
   report("sign", { state: "active" });
-  const callArgs = [input.name.trim(), input.community.trim(), input.feeBps, [ADDR.mirrorAdapterImpl], `preset:${input.mapId}`] as const;
+  const mapURI = input.mapId.startsWith("osm:") ? input.mapId : `preset:${input.mapId}`;
+  const callArgs = [input.name.trim(), input.community.trim(), input.feeBps, [ADDR.mirrorAdapterImpl], mapURI] as const;
   const [estimate, fees] = await Promise.all([
     publicClient.estimateContractGas({ address: ADDR.factory, abi: factoryAbi, functionName: "createCity", args: callArgs, account: owner }),
     feeCaps(),

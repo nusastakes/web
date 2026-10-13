@@ -51,6 +51,13 @@ const mapCache = new Map<string, CityMap>();
 async function loadMap(id: string): Promise<CityMap> {
   const hit = mapCache.get(id);
   if (hit) return hit;
+  if (id.startsWith("osm:")) {
+    // Area asli dari OpenStreetMap; bila semua server sibuk, pakai peta bawaan supaya kota tetap tampil.
+    const { loadOsmCity } = await import("@/lib/osm");
+    const map = (await loadOsmCity(id)) ?? (await loadMap("scbd-jakarta"));
+    mapCache.set(id, map);
+    return map;
+  }
   const res = await fetch(`/maps/${id}.city.json`);
   if (!res.ok) throw new Error(`peta ${id} tidak bisa dimuat (${res.status})`);
   const map = (await res.json()) as CityMap;

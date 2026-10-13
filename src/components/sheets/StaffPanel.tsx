@@ -94,7 +94,7 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
   const readReport = async () => {
     setReport("…");
     try { const r = await getReport(vault, 7); setReport(typeof r.text === "string" ? r.text.replace(/\*\*/g, "") : String(r.status ?? "No report yet.")); }
-    catch (e) { setReport(null); setError(humanError(e)); }
+    catch { setReport("The weekly report is still being written. Try again in a minute."); }
   };
 
   if (!agents) return <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> Loading the AI staff market…</div>;

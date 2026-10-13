@@ -13,6 +13,7 @@ import { IconPlus } from "../icons";
 import StepList from "../StepList";
 import { Field, Notice, Sheet, Spinner, inputCls } from "../ui";
 import NeedAccount from "./NeedAccount";
+import PlacePicker from "./PlacePicker";
 
 interface Props { onClose: () => void; onFounded: (vault?: Hex) => void }
 
@@ -25,6 +26,8 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
   const [name, setName] = useState("");
   const [community, setCommunity] = useState("");
   const [mapId, setMapId] = useState<string>(MAP_PRESETS[0].id);
+  const [source, setSource] = useState<"preset" | "real">("preset");
+  const [realMap, setRealMap] = useState<string | null>(null);
   const [feeBps, setFeeBps] = useState(1000);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +44,8 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
   }, [ready, w.address]);
   const lowGas = ready && balances !== undefined && need !== null && balances.mon < need;
   const mon = (v: bigint) => (Number(v) / 1e18).toFixed(2);
-  const problem = name.trim().length < 3 ? "Give the city a name (3+ letters)." : lowGas ? "You need more testnet MON first." : null;
+  const chosenMap = source === "real" ? realMap : mapId;
+  const problem = name.trim().length < 3 ? "Give the city a name (3+ letters)." : !chosenMap ? "Pick a real place first." : lowGas ? "You need more testnet MON first." : null;
 
   const getGas = async () => {
     if (!w.address) return;
@@ -54,7 +58,7 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
     setError(null); setFounded(false);
     setSteps(FOUND_STEPS.map((s) => ({ ...s })));
     try {
-      const res = await foundCityFlow({ wallet: w, owner: w.address, input: { name, community, feeBps, mapId }, report });
+      const res = await foundCityFlow({ wallet: w, owner: w.address, input: { name, community, feeBps, mapId: chosenMap ?? MAP_PRESETS[0].id }, report });
       setFounded(true);
       emitChange();
       onFounded(res.vault);
@@ -71,11 +75,21 @@ export default function FoundCitySheet({ onClose, onFounded }: Props) {
         <div className="space-y-3">
           <Field label="City name"><input className={inputCls} value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kota Jogja" disabled={busy} /></Field>
           <Field label="Community (optional)"><input className={inputCls} value={community} maxLength={40} onChange={(e) => setCommunity(e.target.value)} placeholder="e.g. Web3 Jogja" disabled={busy} /></Field>
-          <Field label="Where is your city?">
+          {/* Bukan <Field>: isinya berisi tombol dan kanvas, dan <label> akan meneruskan klik ke tombol pertama. */}
+          <div>
+            <span className="mb-1 block text-xs font-medium text-ink-soft">Where is your city?</span>
+            <div className="mb-1.5 flex gap-1 rounded-xl bg-slate-900/5 p-1">
+              {(["preset", "real"] as const).map((k) => (
+                <button key={k} type="button" onClick={() => setSource(k)} disabled={busy}
+                  className={`flex-1 rounded-lg px-2 py-1 text-xs font-semibold ${source === k ? "bg-white text-ink shadow-sm" : "text-ink-soft"}`}>{k === "preset" ? "Ready-made map" : "A real place (OpenStreetMap)"}</button>
+              ))}
+            </div>
+            {source === "real" ? <PlacePicker disabled={busy} onReady={(id) => setRealMap(id)} /> : (
             <select className={inputCls} value={mapId} onChange={(e) => setMapId(e.target.value)} disabled={busy}>
               {MAP_PRESETS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-          </Field>
+            )}
+          </div>
           <Field label="Your fee on profit" hint={<span className="font-semibold text-ink">{fmtBps(feeBps)}</span>}>
             <input type="range" min={0} max={2000} step={50} value={feeBps} onChange={(e) => setFeeBps(Number(e.target.value))} disabled={busy} className="w-full accent-[var(--accent)]" />
           </Field>

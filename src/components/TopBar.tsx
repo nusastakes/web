@@ -5,7 +5,7 @@ import brand from "@/lib/brand.json";
 import { fmtAusd } from "@/lib/format";
 import type { CityView } from "@/lib/types";
 import AccountMenu from "./AccountMenu";
-import { IconChevron, IconLogo } from "./icons";
+import { IconChart, IconChevron, IconLogo } from "./icons";
 import { Badge, Card } from "./ui";
 
 interface Props {
@@ -13,10 +13,12 @@ interface Props {
   preview: CityView[];
   current?: CityView;
   onPick: (id: string) => void;
+  /** Membuka papan peringkat dan laporan ekonomi. */
+  onExplore?: () => void;
   onAfterAccountChange: () => void;
 }
 
-export default function TopBar({ cities, preview, current, onPick, onAfterAccountChange }: Props) {
+export default function TopBar({ cities, preview, current, onPick, onAfterAccountChange, onExplore }: Props) {
   const [open, setOpen] = useState(false);
   const row = (c: CityView) => (
     <button key={c.id} onClick={() => { onPick(c.id); setOpen(false); }}
@@ -54,6 +56,11 @@ export default function TopBar({ cities, preview, current, onPick, onAfterAccoun
             </>
           )}
         </div>
+        {onExplore && (
+          <button onClick={onExplore} aria-label="Explore cities" className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-900/10 bg-white/70 px-2.5 py-1.5 text-sm font-medium text-ink hover:bg-white">
+            <IconChart width={15} height={15} /><span className="hidden sm:inline">Leaderboard</span>
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <span className="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 md:inline-flex">

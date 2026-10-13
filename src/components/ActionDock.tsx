@@ -3,7 +3,7 @@
 import { IconArrowDown, IconArrowUp, IconInfo, IconPlus, IconRecenter, IconSwap } from "./icons";
 import { Card, cx } from "./ui";
 
-export type SheetKind = "deposit" | "withdraw" | "found" | "manage" | null;
+export type SheetKind = "deposit" | "withdraw" | "found" | "manage" | "explore" | null;
 
 interface Props {
   active: SheetKind;

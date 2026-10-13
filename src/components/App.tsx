@@ -12,6 +12,7 @@ import CityPanel from "./CityPanel";
 import KpiRow from "./KpiRow";
 import TopBar from "./TopBar";
 import DepositSheet from "./sheets/DepositSheet";
+import ExploreSheet from "./sheets/ExploreSheet";
 import FoundCitySheet from "./sheets/FoundCitySheet";
 import ManageSheet from "./sheets/ManageSheet";
 import WithdrawSheet from "./sheets/WithdrawSheet";
@@ -80,7 +81,7 @@ function Shell() {
       <CityCanvas mapId={current.mapId} districts={current.districts} selectedId={districtId} onSelect={setDistrictId} resetSignal={recenter} onScene={onScene} style={style} onTick={setTick} onInspect={setInspect} cityName={current.name} onBuilding={setBuilding} />
 
       <div className="pointer-events-none absolute inset-x-3 top-3 sm:inset-x-4 sm:top-4">
-        <TopBar cities={cities} preview={PREVIEW_CITIES} current={current} onPick={pick} onAfterAccountChange={refresh} />
+        <TopBar cities={cities} preview={PREVIEW_CITIES} current={current} onPick={pick} onAfterAccountChange={refresh} onExplore={() => open("explore")} />
       </div>
 
       {/* Tengah: KPI di kiri, panel kota di kanan. Posisinya tetap; sheet di bawah tidak menekannya. */}
@@ -94,6 +95,7 @@ function Shell() {
           {mobilePanel && <div className="md:hidden"><CityPanel city={current} selectedId={districtId} onSelect={setDistrictId} me={wallet.address} /></div>}
           {!mobilePanel && sheet === "deposit" && <DepositSheet city={current} onClose={() => setSheet(null)} onDone={refresh} />}
           {!mobilePanel && sheet === "withdraw" && <WithdrawSheet city={current} onClose={() => setSheet(null)} onDone={refresh} />}
+          {!mobilePanel && sheet === "explore" && <ExploreSheet onClose={() => setSheet(null)} onPick={pick} me={wallet.address} />}
           {!mobilePanel && sheet === "manage" && <ManageSheet city={current} onClose={() => setSheet(null)} onDone={refresh} style={style} styleCode={styleCode} onStyle={(s) => void saveStyle(s)} styleSync={styleSync} styleError={styleError} />}
           {!mobilePanel && sheet === "found" && <FoundCitySheet onClose={() => setSheet(null)} onFounded={async (vault) => { await refresh(); if (vault) pick(vault); }} />}
         </div>

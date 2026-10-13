@@ -14,9 +14,10 @@ const HIDDEN_CITY = /\(ignore\)/i;
 /** `?all=1` menampilkan juga kota uji (untuk debug). Hanya dibaca di klien, setelah mount. */
 const showAll = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("all");
 
-/** `preset:<id>` menunjuk peta bawaan; nilai lain jatuh ke peta bawaan pertama sampai peta kustom (R24) tersedia. */
+/** `preset:<id>` menunjuk peta bawaan; `osm:<lat>,<lon>` area asli dari OpenStreetMap (R24); lainnya peta bawaan. */
 export function mapIdFromUri(uri: string): string {
   if (uri.startsWith("preset:")) return uri.slice("preset:".length);
+  if (/^osm:-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(uri)) return uri;
   return "scbd-jakarta";
 }
 

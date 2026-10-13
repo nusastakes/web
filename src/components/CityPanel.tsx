@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getReport } from "@/lib/relayer";
 import { useNowSeconds } from "@/lib/hooks";
 import { addressUrl } from "@/lib/config";
 import { fmtAusd, fmtBps, shortAddr, timeAgo } from "@/lib/format";
@@ -37,6 +38,23 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
   const selected = city.districts.find((d) => d.id === selectedId) ?? null;
   const isMayor = me && city.mayor && me.toLowerCase() === city.mayor.toLowerCase();
   const nowSec = useNowSeconds();
+  const [report, setReport] = useState<{ city: string; text: string } | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const readReport = async () => {
+    if (!city.vault) return;
+    if (report?.city === city.vault) { setReport(null); return; }
+    setLoadingReport(true);
+    try {
+      const r = await getReport(city.vault, 7);
+      const text = typeof r.text === "string" ? r.text.replace(/\*\*/g, "")
+        : r.status === "not-hired" ? "This city has no Humas yet. The mayor can hire one in the city hall." : "No report yet.";
+      setReport({ city: city.vault, text });
+    } catch {
+      // Laporan ditulis ulang oleh LLM di relayer; permintaan pertama bisa lama dan terputus di proxy.
+      setReport({ city: city.vault, text: "The weekly report is still being written. Try again in a minute." });
+    }
+    finally { setLoadingReport(false); }
+  };
 
   return (
     <Card className="pointer-events-auto flex max-h-full w-full flex-col overflow-hidden max-sm:bg-white/97! sm:w-[340px]">
@@ -100,6 +118,15 @@ export default function CityPanel({ city, selectedId, onSelect, me }: Props) {
           </div>
         )}
       </div>
+
+      {!city.preview && city.vault && (
+        <div className="border-t border-slate-900/5 px-4 py-2">
+          <button onClick={readReport} className="text-xs font-semibold text-accent hover:underline" disabled={loadingReport}>
+            {loadingReport ? "Loading the weekly report…" : report?.city === city.vault ? "Hide the weekly report" : "Read the weekly report (Humas)"}
+          </button>
+          {report?.city === city.vault && <div className="mt-1.5 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-900/[0.04] p-2 text-[11px] leading-relaxed text-ink">{report.text}</div>}
+        </div>
+      )}
 
       <div className="border-t border-slate-900/5 px-4 py-2.5 text-[11px] leading-relaxed text-ink-soft">
         The mayor keeps <strong className="text-ink">{fmtBps(city.feeBps)}</strong> of profit only, and can never move funds to their own wallet.
