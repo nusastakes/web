@@ -1,10 +1,14 @@
-import { defineChain } from "viem";
+import { defineChain, fallback, http } from "viem";
 import deployment from "./deployment.json";
 import type { Hex } from "./types";
 
 const env = (v: string | undefined, fallback: string) => (v && v.trim() ? v.trim() : fallback);
 
 export const RPC_URL = env(process.env.NEXT_PUBLIC_MONAD_TESTNET_RPC, "https://testnet-rpc.monad.xyz");
+/** RPC cadangan: RPC publik testnet menolak permintaan saat ramai, jadi baca dan kirim pindah ke endpoint lain. */
+export const RPC_FALLBACKS = env(process.env.NEXT_PUBLIC_MONAD_TESTNET_RPC_FALLBACKS, "https://rpc.ankr.com/monad_testnet,https://monad-testnet.drpc.org")
+  .split(",").map((u) => u.trim()).filter((u) => /^https:\/\//.test(u) && u !== RPC_URL);
+export const rpcTransport = () => (RPC_FALLBACKS.length ? fallback([http(RPC_URL), ...RPC_FALLBACKS.map((u) => http(u))], { rank: false, retryCount: 2 }) : http(RPC_URL));
 export const EXPLORER = "https://testnet.monadvision.com";
 export const RELAYER_URL = env(process.env.NEXT_PUBLIC_RELAYER_URL, "http://localhost:8787");
 

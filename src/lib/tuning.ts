@@ -4,7 +4,7 @@ import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiP
 import { tunedAdapterAbi } from "./abis";
 import type { Step } from "./actions";
 import { publicClient } from "./chain";
-import { RPC_URL, monadTestnet } from "./config";
+import { monadTestnet, rpcTransport } from "./config";
 import type { Knobs } from "./catalog";
 import type { Tuning } from "./relayer";
 import type { Hex } from "./types";
@@ -106,8 +106,8 @@ export async function setTuningFlow(args: { wallet: WalletApi; adapter: Hex; own
   const hash = useDeputy
     ? await wallet.sendAsDeputy(tx)
     : await wallet.withCeremony("Confirm the new setting with your passkey…", async (account) => {
-        const { createWalletClient, http } = await import("viem");
-        return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction(tx as never);
+        const { createWalletClient } = await import("viem");
+        return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction(tx as never);
       });
   report("sign", { state: "done", detail: undefined });
   report("send", { state: "done", hash });

@@ -1,4 +1,4 @@
-import { ADDR, RPC_URL, monadTestnet } from "./config";
+import { ADDR, monadTestnet, rpcTransport } from "./config";
 import { adapterAbi, erc20Abi, marketplaceAbi, vaultAbi } from "./abis";
 import { publicClient } from "./chain";
 import { relayDeposit, relayWithdraw, requestGas, splitSignature, type DepositResult, type HireVia, type WithdrawResult } from "./relayer";
@@ -243,8 +243,8 @@ export async function rebalanceFlow(args: { wallet: WalletApi; input: RebalanceI
   const hash = useDeputy
     ? await wallet.sendAsDeputy(tx)
     : await wallet.withCeremony("Confirm the change with your passkey…", async (account) => {
-        const { createWalletClient, http } = await import("viem");
-        return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction(tx as never);
+        const { createWalletClient } = await import("viem");
+        return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction(tx as never);
       });
   report("sign", { state: "done", detail: undefined });
   report("send", { state: "done", hash });
@@ -273,8 +273,8 @@ export async function setDeputyFlow(args: { wallet: WalletApi; vault: Hex; deput
       publicClient.estimateContractGas({ address: vault, abi: vaultAbi, functionName: "setSessionKey", args: callArgs, account: account.address }),
       feeCaps(),
     ]);
-    const { createWalletClient, http } = await import("viem");
-    return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction({
+    const { createWalletClient } = await import("viem");
+    return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction({
       to: vault,
       data: encodeFunctionData({ abi: vaultAbi, functionName: "setSessionKey", args: callArgs }),
       gas: (estimate * 120n) / 100n,
@@ -318,8 +318,8 @@ export async function contractTx(wallet: WalletApi, call: ContractCall | ((accou
   if (opts.ceremony) {
     hash = await wallet.withCeremony(opts.label, async (account) => {
       const c = typeof call === "function" ? await call(account) : call;
-      const { createWalletClient, http } = await import("viem");
-      return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction((await build(account.address, c)) as never);
+      const { createWalletClient } = await import("viem");
+      return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction((await build(account.address, c)) as never);
     });
   } else {
     if (typeof call === "function") throw new Error("This action needs a fresh passkey confirmation.");

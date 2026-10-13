@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { createWalletClient, http, type LocalAccount } from "viem";
+import { createWalletClient, type LocalAccount } from "viem";
 import type { Secp256k1SigningSession } from "@category-labs/mera";
 import brand from "./brand.json";
-import { RPC_URL, monadTestnet } from "./config";
+import { monadTestnet, rpcTransport } from "./config";
 import { markCeremony, markStart } from "./metrics";
 import type { Hex } from "./types";
 
@@ -303,7 +303,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const sendWith = useCallback(async (account: LocalAccount | null, tx: TxRequest) => {
     if (!account) throw Object.assign(new Error("session ended"), { code: "SESSION_ENDED" });
     touch();
-    return createWalletClient({ account, chain: monadTestnet, transport: http(RPC_URL) }).sendTransaction(tx as never);
+    return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction(tx as never);
   }, []);
   const sendTransaction = useCallback((tx: TxRequest) => sendWith(accountRef.current, tx), [sendWith]);
   const sendAsDeputy = useCallback((tx: TxRequest) => sendWith(deputyAccountRef.current, tx), [sendWith]);

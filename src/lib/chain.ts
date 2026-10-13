@@ -1,14 +1,14 @@
 import { loadCatalog, serviceBySource, CATEGORY_KIND } from "./catalog";
 import { parseOsmUri } from "./osm";
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
 import { adapterAbi, apyFeedAbi, erc20Abi, factoryAbi, tunedAdapterAbi, vaultAbi } from "./abis";
-import { ADDR, RPC_URL, SOURCE_ID, monadTestnet } from "./config";
+import { ADDR, SOURCE_ID, monadTestnet, rpcTransport } from "./config";
 import { ausdToNumber } from "./format";
 import type { CityView, District, Hex } from "./types";
 
 export const publicClient = createPublicClient({
   chain: monadTestnet,
-  transport: http(RPC_URL),
+  transport: rpcTransport(),
   batch: { multicall: true },
 });
 
