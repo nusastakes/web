@@ -27,7 +27,8 @@ export interface Copy {
   auth: {
     lookAround: string; h1: string; lead: string; points: [string, string][]; works: string; worksList: string[]; notWorks: string; notWorksList: string[];
     tabNew: string; tabBack: string; unlockTitle: string; createTitle: string; backTitle: string; unlockSub: string; createSub: string; backSub: string;
-    btnUnlock: string; btnCreate: string; btnBack: string; waiting: string; prf: string; testnet: string; inTitle: string; inBody: string; enter: string;
+    btnUnlock: string; btnCreate: string; btnBack: string; waiting: string; busyCreate: string; busyHint: string; prf: string; seeDevices: string; testnet: string; inTitle: string; inBody: string; enter: string;
+    steps: [string, string, string]; devicesTitle: string; cancelled: string; needHttps: string; noPasskeys: string; inApp: string; account: string; tryAgain: string;
   };
 }
 
@@ -98,9 +99,15 @@ const EN: Copy = {
     notWorks: "Does not work", notWorksList: ["A Chrome profile not signed in to Google", "Bitwarden or Dashlane", "Browsers inside chat apps"],
     tabNew: "New here", tabBack: "I have an account", unlockTitle: "Unlock your account", createTitle: "Create your account", backTitle: "Welcome back",
     unlockSub: "Your session locked itself after 10 idle minutes.", createSub: "One prompt from your device. That is the whole sign-up.", backSub: "Choose the passkey you used before. Same passkey, same account, on any device.",
-    btnUnlock: "Unlock with fingerprint", btnCreate: "Create account with fingerprint", btnBack: "Sign in with fingerprint", waiting: "Waiting for your passkey…",
-    prf: "Your passkey must support PRF. See the devices that work on this page.", testnet: "Test network only. Test money is free; nothing here is real money.",
+    btnUnlock: "Unlock with fingerprint", btnCreate: "Create account with fingerprint", btnBack: "Sign in with fingerprint", waiting: "Waiting for your passkey…", busyCreate: "Creating your passkey…",
+    busyHint: "Your device is asking for your fingerprint, face or PIN. Look for its pop-up.",
+    prf: "This device or password manager cannot make the keys we need (a feature called PRF). Try one of the devices below.", seeDevices: "See devices that work", testnet: "Test network only. Test money is free; nothing here is real money.",
     inTitle: "You are in", inBody: "Taking you to the city…", enter: "Enter the city",
+    steps: ["Tap the button", "Confirm with fingerprint, face or PIN", "You arrive in the city"], devicesTitle: "Will it work on my device?",
+    cancelled: "You closed the prompt. Tap the button again when you are ready.", needHttps: "Passkeys only work on a secure page (https).",
+    noPasskeys: "This browser does not support passkeys. Open this page in Chrome, Safari or Edge.",
+    inApp: "You look to be inside another app's browser, where passkeys often fail. Open this page in Chrome or Safari.",
+    account: "Account", tryAgain: "Try again",
   },
 };
 
@@ -171,9 +178,15 @@ const ID: Copy = {
     notWorks: "Belum bisa", notWorksList: ["Profil Chrome yang tidak masuk ke Google", "Bitwarden atau Dashlane", "Browser di dalam aplikasi chat"],
     tabNew: "Baru di sini", tabBack: "Sudah punya akun", unlockTitle: "Buka kunci akun Anda", createTitle: "Buat akun Anda", backTitle: "Selamat datang kembali",
     unlockSub: "Sesi Anda terkunci sendiri setelah 10 menit diam.", createSub: "Satu permintaan dari perangkat Anda. Hanya itu pendaftarannya.", backSub: "Pilih passkey yang dulu Anda pakai. Passkey sama, akun sama, di perangkat mana pun.",
-    btnUnlock: "Buka dengan sidik jari", btnCreate: "Buat akun dengan sidik jari", btnBack: "Masuk dengan sidik jari", waiting: "Menunggu passkey Anda…",
-    prf: "Passkey Anda harus mendukung PRF. Lihat daftar perangkat yang bisa dipakai di halaman ini.", testnet: "Hanya jaringan uji. Uang uji gratis; tidak ada uang sungguhan di sini.",
+    btnUnlock: "Buka dengan sidik jari", btnCreate: "Buat akun dengan sidik jari", btnBack: "Masuk dengan sidik jari", waiting: "Menunggu passkey Anda…", busyCreate: "Membuat passkey Anda…",
+    busyHint: "Perangkat Anda sedang meminta sidik jari, wajah, atau PIN. Cari jendela kecilnya.",
+    prf: "Perangkat atau pengelola kata sandi ini belum bisa membuat kunci yang kami butuhkan (fitur bernama PRF). Coba salah satu perangkat di bawah.", seeDevices: "Lihat perangkat yang bisa", testnet: "Hanya jaringan uji. Uang uji gratis; tidak ada uang sungguhan di sini.",
     inTitle: "Anda sudah masuk", inBody: "Mengantar Anda ke kota…", enter: "Masuk ke kota",
+    steps: ["Ketuk tombolnya", "Konfirmasi dengan sidik jari, wajah, atau PIN", "Anda tiba di kota"], devicesTitle: "Apakah bisa di perangkat saya?",
+    cancelled: "Anda menutup jendela permintaannya. Ketuk tombolnya lagi kalau sudah siap.", needHttps: "Passkey hanya bisa dipakai di halaman aman (https).",
+    noPasskeys: "Browser ini belum mendukung passkey. Buka halaman ini di Chrome, Safari, atau Edge.",
+    inApp: "Sepertinya Anda membuka halaman ini di dalam browser aplikasi lain, tempat passkey sering gagal. Buka di Chrome atau Safari.",
+    account: "Akun", tryAgain: "Coba lagi",
   },
 };
 
