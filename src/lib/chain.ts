@@ -144,6 +144,16 @@ export async function readPosition(vault: Hex, owner: Hex): Promise<Position> {
   return { shares, assets, ausd, maxDeposit };
 }
 
+/** Vault yang dipegang `owner` (saldo share > 0); dipakai untuk tahu apakah ia sudah pernah menyetor ke kota mana pun. */
+export async function readHeldVaults(vaults: Hex[], owner: Hex): Promise<Hex[]> {
+  if (vaults.length === 0) return [];
+  const res = await publicClient.multicall({
+    allowFailure: true,
+    contracts: vaults.map((v) => ({ address: v, abi: vaultAbi, functionName: "balanceOf" as const, args: [owner] as const })),
+  });
+  return vaults.filter((_, i) => res[i].status === "success" && (res[i].result as bigint) > 0n);
+}
+
 export async function readAusdBalance(owner: Hex): Promise<bigint> {
   return publicClient.readContract({ address: ADDR.ausd, abi: erc20Abi, functionName: "balanceOf", args: [owner] });
 }

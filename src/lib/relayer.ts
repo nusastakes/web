@@ -33,6 +33,22 @@ export interface WithdrawResult extends TxResult { assets?: string; receiver?: s
 
 export const relayerHealth = () => call<Health>("/health");
 export const requestAusd = (address: Hex) => call<TxResult>("/faucet", { address });
+/**
+ * Faucet AUSD yang sabar: kontrak faucet membatasi frekuensi permintaan untuk semua orang, jadi saat sedang penuh
+ * relayer membalas 429 dengan `retryAfterSeconds` pendek. Kita menunggu lalu mencoba lagi (maksimal `maxAttempts`).
+ */
+export async function requestAusdPatient(address: Hex, onWait?: (secondsLeft: number, attempt: number) => void, maxAttempts = 6): Promise<TxResult> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await requestAusd(address);
+    } catch (e) {
+      const transient = e instanceof RelayerError && e.status === 429 && e.retryAfterSeconds !== undefined && e.retryAfterSeconds <= 60;
+      if (!transient || attempt >= maxAttempts) throw e;
+      const wait = Math.max(5, Math.ceil((e as RelayerError).retryAfterSeconds ?? 20));
+      for (let s = wait; s > 0; s--) { onWait?.(s, attempt); await new Promise((r) => setTimeout(r, 1000)); }
+    }
+  }
+}
 export const requestGas = (address: Hex) => call<{ hash: Hex; amountWei: string }>("/gas-drip", { address });
 
 /** Gaya kota yang disimpan relayer (hanya tampilan). */

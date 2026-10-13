@@ -21,6 +21,11 @@ import type { CityTick, SceneApi } from "./CityCanvas";
 import { BuildingCard, InspectCard, LifeClock } from "./LifeHud";
 import DemoDirector from "./DemoDirector";
 import IntroTour from "./IntroTour";
+import Onboarding from "./Onboarding";
+import { Notice } from "./ui";
+import { APP } from "@/lib/copy-app";
+import { useLang } from "@/lib/lang";
+import { setOnb, useOnboarding } from "@/lib/onboarding";
 import type { InteriorInfo } from "@/lib/scene/interior";
 import type { Inspect } from "@/lib/scene/life";
 
@@ -28,7 +33,8 @@ const CityCanvas = dynamic(() => import("./CityCanvas"), { ssr: false });
 
 function Shell() {
   const wallet = useWallet();
-  const { cities, refresh } = useCities();
+  const { cities, refresh, loading: citiesLoading, error: citiesError } = useCities();
+  const [lang] = useLang();
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [districtId, setDistrictId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -40,6 +46,7 @@ function Shell() {
   const mine = wallet.address ? [...cities].reverse().find((c) => c.mayor?.toLowerCase() === wallet.address!.toLowerCase()) : undefined;
   const current = all.find((c) => c.id === pickedId) ?? mine ?? cities[0] ?? PREVIEW_CITIES[0];
 
+  const ob = useOnboarding({ address: wallet.address, ready: wallet.status === "ready" && !!wallet.address, citiesReady: !citiesLoading, cities, current, mine });
   const isMayor = wallet.status === "ready" && !!current.mayor && current.mayor.toLowerCase() === wallet.address?.toLowerCase();
 
   // Kota hidup: kejadian onchain menjadi truk, kerumunan, dan pin di kota 3D.
@@ -50,6 +57,7 @@ function Shell() {
   const [inspect, setInspect] = useState<Inspect | null>(null);
   const [speed, setSpeed] = useState(16);
   const [building, setBuilding] = useState<InteriorInfo | null>(null);
+  const onBuilding = useCallback((b: InteriorInfo | null) => { setBuilding(b); if (b) setOnb({ looked: true }); }, []);
   // `?demo=1` memulai mode demo langsung (untuk rekaman video).
   const [demo, setDemo] = useState(false);
   const stopDemo = useCallback(() => setDemo(false), []);
@@ -83,11 +91,18 @@ function Shell() {
   const { style, code: styleCode, save: saveStyle, sync: styleSync, error: styleError } = useCityStyle(current.vault ?? current.id, current.preview ? undefined : current.vault, wallet);
 
   const pick = useCallback((id: string) => { setPickedId(id); setDistrictId(null); }, []);
+  // Saat setoran pertama selesai dan ucapan selamat muncul, lembar setor ditutup supaya kartunya terlihat.
+  const [wasCelebrating, setWasCelebrating] = useState(false);
+  if (ob.celebrate !== wasCelebrating) {
+    setWasCelebrating(ob.celebrate);
+    if (ob.celebrate && sheet === "deposit") setSheet(null);
+  }
   const open = (k: Exclude<SheetKind, null>) => { setSheet((s) => (s === k ? null : k)); setMobilePanel(false); };
+  const show = (k: Exclude<SheetKind, null>) => { setSheet(k); setMobilePanel(false); };
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <CityCanvas mapId={current.mapId} districts={current.districts} selectedId={districtId} onSelect={setDistrictId} resetSignal={recenter} onScene={onScene} style={style} onTick={setTick} onInspect={setInspect} cityName={current.name} onBuilding={setBuilding} />
+      <CityCanvas mapId={current.mapId} districts={current.districts} selectedId={districtId} onSelect={setDistrictId} resetSignal={recenter} onScene={onScene} style={style} onTick={setTick} onInspect={setInspect} cityName={current.name} onBuilding={onBuilding} />
 
       <div className="pointer-events-none absolute inset-x-3 top-3 sm:inset-x-4 sm:top-4">
         <TopBar cities={cities} preview={PREVIEW_CITIES} current={current} onPick={pick} onAfterAccountChange={refresh} onExplore={() => open("explore")} />
@@ -109,17 +124,19 @@ function Shell() {
           {!mobilePanel && sheet === "manage" && <ManageSheet city={current} onClose={() => setSheet(null)} onDone={refresh} style={style} styleCode={styleCode} onStyle={(s) => void saveStyle(s)} styleSync={styleSync} styleError={styleError} />}
           {!mobilePanel && sheet === "found" && <FoundCitySheet onClose={() => setSheet(null)} onFounded={async (vault) => { await refresh(); if (vault) pick(vault); }} />}
         </div>
-        <div><ActionDock mayor={isMayor} active={sheet} onOpen={open} onRecenter={() => setRecenter((n) => n + 1)} onDetails={() => { setMobilePanel((v) => !v); setSheet(null); }} /></div>
+        <div><ActionDock mayor={isMayor} highlight={ob.show ? ob.highlight : null} active={sheet} onOpen={open} onRecenter={() => setRecenter((n) => n + 1)} onDetails={() => { setMobilePanel((v) => !v); setSheet(null); }} /></div>
         <div className="pointer-events-none fixed left-3 top-[10.5rem] sm:left-4"><BuildingCard info={building} onClose={() => api?.closeBuilding()} onFloor={(l) => api?.focusFloor(l)} /></div>
         <div className="pointer-events-none fixed bottom-24 left-1/2 -translate-x-1/2"><InspectCard info={inspect} onClose={() => { api?.clearInspect(); setInspect(null); }} /></div>
         <div className="hidden flex-col items-end gap-2 sm:flex">
           <LifeClock tick={tick} api={api} speed={speed} onSpeed={setSpeed} onDemo={() => setDemo(true)} />
         <div className="pointer-events-auto max-w-[260px] text-right text-[10px] leading-snug text-ink-soft/80">
-          Map data © OpenStreetMap contributors · Overture Maps Foundation. Testnet only; no real money.
+          {APP[lang].attribution}
         </div>
         </div>
       </div>
       <DemoDirector api={api} running={demo} onStop={stopDemo} onBefore={beforeDemo} />
+      {citiesError && cities.length === 0 && <div className="pointer-events-none fixed bottom-24 left-1/2 z-30 w-[min(360px,calc(100vw-2rem))] -translate-x-1/2"><Notice tone="warn">{APP[lang].banner.citiesFail}</Notice></div>}
+      {!demo && <Onboarding ob={ob} city={current} hideClass={building || sheet || mobilePanel ? "hidden" : ""} onDeposit={() => show("deposit")} onExplore={() => show("explore")} onFound={() => show("found")} />}
       {!demo && <IntroTour onDemo={() => setDemo(true)} onExplore={() => open("explore")} />}
     </main>
   );

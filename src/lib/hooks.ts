@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { readMayorState, type MayorState } from "./actions";
-import { loadCities, readAusdBalance, readMonBalance, readPosition, type Position } from "./chain";
+import { loadCities, readAusdBalance, readHeldVaults, readMonBalance, readPosition, type Position } from "./chain";
 import type { CityView, Hex } from "./types";
 
 const CHANGED = "nusastakes:changed";
@@ -67,6 +67,14 @@ export function useBalances(owner?: Hex) {
   }, [owner]);
   const r = usePolled(fn, 15_000, Boolean(owner));
   return { balances: r.data, refresh: r.refresh };
+}
+
+/** Vault (dari daftar `vaults`) tempat `owner` punya share. `held` kosong sampai pembacaan untuk daftar ini selesai. */
+export function useHeldVaults(owner?: Hex, vaults: Hex[] = []) {
+  const key = vaults.join(",");
+  const fn = useCallback(async () => ({ key, held: await readHeldVaults(key ? (key.split(",") as Hex[]) : [], owner as Hex) }), [key, owner]);
+  const r = usePolled(fn, 20_000, Boolean(owner));
+  return { held: r.data && r.data.key === key ? r.data.held : undefined, refresh: r.refresh };
 }
 
 /** Detik Unix saat ini, diperbarui tiap 30 detik. Bernilai 0 di server agar hidrasi tidak berbeda. */

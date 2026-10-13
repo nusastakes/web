@@ -8,6 +8,8 @@ import type { CityStyle } from "@/lib/scene/themes";
 import type { InteriorInfo } from "@/lib/scene/interior";
 import type { District } from "@/lib/types";
 import { DISTRICT_COLORS } from "@/lib/palette";
+import { APP } from "@/lib/copy-app";
+import { useLang } from "@/lib/lang";
 import CityMap2D from "./CityMap2D";
 
 /** Pintu masuk ke adegan untuk komponen lain: menjalankan kejadian dan menggerakkan kamera. */
@@ -87,6 +89,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
   const onTickRef = useRef(onTick);
   const onInspectRef = useRef(onInspect);
   const onBuildingRef = useRef(onBuilding);
+  const [lang] = useLang();
   const [error, setError] = useState<string | null>(null);
   const [flat, setFlat] = useState<CityMap | null>(null);
   const [loadedMap, setLoadedMap] = useState<string | null>(null);
@@ -232,7 +235,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
         <div className="absolute inset-0">
           {flat && <CityMap2D map={flat} districts={districts} />}
           <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-6">
-            <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] text-slate-600 backdrop-blur">This device cannot show the 3D city, so here is the map. Everything else works.</span>
+            <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] text-slate-600 backdrop-blur">{APP[lang].no3d}</span>
           </div>
         </div>
       )}

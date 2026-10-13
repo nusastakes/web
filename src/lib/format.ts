@@ -21,9 +21,10 @@ export function parseAusd(input: string): bigint | null {
   return BigInt(whole) * 1_000_000n + BigInt((frac + "000000").slice(0, 6));
 }
 
-export function timeAgo(seconds: number): string {
-  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
+export function timeAgo(seconds: number, lang: "en" | "id" = "en"): string {
+  const id = lang === "id";
+  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))}${id ? " dtk lalu" : "s ago"}`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}${id ? " mnt lalu" : "m ago"}`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}${id ? " jam lalu" : "h ago"}`;
+  return `${Math.floor(seconds / 86400)}${id ? " hari lalu" : "d ago"}`;
 }
