@@ -5,23 +5,24 @@ import type { SceneApi } from "./CityCanvas";
 import { Card } from "./ui";
 
 /**
- * Mode demo terskrip (untuk video dan juri): satu putaran sekitar 70 detik di kota contoh yang memperlihatkan setor,
- * tata ulang dengan rencana tersegel, usulan Analis, isi balai kota, evakuasi Satpam, acara, dan malam hari.
- * Semua kejadian di sini adalah contoh tampilan, bukan transaksi.
+ * Mode demo terskrip (untuk video dan juri): satu putaran sekitar 80 detik di kota contoh yang mengikuti alur 14 Okt
+ * (vault TC67.10, naskah TC42): gedung adalah layanan protokol Monad, setor tanpa gas, setelan layanan, aturan dan
+ * autopilot, staf AI di balai kota, evakuasi Satpam, loket untuk pengunjung yang fee-nya mengalir ke vault, dan ukuran
+ * kota yang dihitung. Semua kejadian di sini adalah contoh tampilan, bukan transaksi.
  */
 
 interface Beat { at: number; caption: string; run: (s: SceneApi) => void }
 
 const BEATS: Beat[] = [
-  { at: 0, caption: "A city on Monad. Residents deposit AUSD with a passkey: no seed phrase, no gas.", run: (s) => { s.closeBuilding(); s.setWeather("clear"); s.setHour(7.6); s.setClockSpeed(16); s.resetCamera(); s.emit({ type: "deposit", amount: 500 }); } },
-  { at: 7, caption: "Deposits arrive at the plaza as trucks of crates. The city grows with its funds.", run: (s) => { s.focusDistrict("idle"); s.emit({ type: "deposit", amount: 1200 }); } },
-  { at: 14, caption: "The mayor writes the plan first, sealed with a key only their passkey can recreate, then moves funds to the lending district.", run: (s) => { s.emit({ type: "agenda", kind: "seal", text: "Mayor writes a sealed plan in the strategy book" }); s.emit({ type: "transfer", from: "idle", to: "lend", amount: 1200 }); s.focusDistrict("lend"); } },
-  { at: 23, caption: "The AI Analyst proposes a move with its reason. Nothing moves until the mayor approves with one tap.", run: (s) => { s.emit({ type: "propose", id: "demo", from: "lend", to: "vault", amount: 800 }); s.focusDistrict("vault"); } },
-  { at: 30, caption: "Approved: the contract moves the funds, within its limits.", run: (s) => { s.emit({ type: "approve", id: "demo" }); } },
-  { at: 36, caption: "Inside the town hall: the mayor at work, the council discussing the move, the AI staff at their desks.", run: (s) => { s.openTownHall(); } },
+  { at: 0, caption: "A city on Monad. Every building is a service: a position in a Monad protocol that the mayor runs for the residents.", run: (s) => { s.closeBuilding(); s.setWeather("clear"); s.setHour(7.6); s.setClockSpeed(16); s.resetCamera(); s.emit({ type: "deposit", amount: 500 }); } },
+  { at: 7, caption: "Residents deposit AUSD into the city with a passkey: no seed phrase, no gas. The city grows with its funds.", run: (s) => { s.focusDistrict("idle"); s.emit({ type: "deposit", amount: 1200 }); } },
+  { at: 14, caption: "The mayor tunes each service with a depositor's own rights there: a loop on Neverland, reward tokens on Aave, a price range on Uniswap.", run: (s) => { s.emit({ type: "transfer", from: "idle", to: "lend", amount: 1200, label: "Mayor puts funds to work" }); s.focusDistrict("lend"); } },
+  { at: 23, caption: "The mayor writes rules, or switches on ready-made ones. The autopilot is a limited key: it moves and tunes the city's money, never withdraws it.", run: (s) => { s.emit({ type: "agenda", kind: "deputy", text: "Mayor allows the autopilot for 7 days" }); s.focusDistrict("vault"); } },
+  { at: 30, caption: "A rule fires: the autopilot moves funds to the best rate by itself. Every move is a transaction anyone can check.", run: (s) => { s.emit({ type: "transfer", from: "lend", to: "vault", amount: 800, tone: "violet", label: "Autopilot: chase the best rate" }); } },
+  { at: 36, caption: "Inside the town hall: the mayor at work and the AI staff, each a hired service with ratings on chain.", run: (s) => { s.openTownHall(); } },
   { at: 47, caption: "Satpam, a Chainlink CRE workflow, sees risk and pulls the funds back to the plaza. It can never send them anywhere else.", run: (s) => { s.closeBuilding(); s.emit({ type: "alert", at: "lend", amount: 900, label: "Satpam: evacuating Lending district" }); s.focusDistrict("lend"); } },
-  { at: 56, caption: "The mayor earns only from residents' profit, and hosts an event to bring more people in.", run: (s) => { s.emit({ type: "harvest", amount: 12.4 }); s.emit({ type: "festival", at: "vault", label: "Mayor's event" }); s.focusDistrict("vault"); } },
-  { at: 64, caption: "Night falls. The city keeps living: night market, lit windows, fireworks.", run: (s) => { s.setHour(19.4); s.emit({ type: "fireworks" }); s.resetCamera(); } },
+  { at: 56, caption: "Cities also sell services to visitors, like a token launchpad. Fees stream into the vault, so residents earn them; the mayor only shares their profit.", run: (s) => { s.emit({ type: "festival", at: "vault", label: "Stage: a visitor launches a token" }); s.emit({ type: "harvest", amount: 12.4 }); s.focusDistrict("vault"); } },
+  { at: 64, caption: "A city's size is computed from what happens in it: kinds of services, how many are used, and its own money.", run: (s) => { s.setHour(19.4); s.emit({ type: "fireworks" }); s.resetCamera(); } },
   { at: 72, caption: "That is Nusastakes. Sign in with a passkey to deposit, or found your own city.", run: () => undefined },
 ];
 const LENGTH = 80;
