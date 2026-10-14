@@ -16,6 +16,8 @@ import CityMap2D from "./CityMap2D";
 export interface SceneApi {
   emit: (e: LifeEvent) => void;
   setActivity: (v: number) => void;
+  /** Tingkat pembangunan dari skor kota (0..1), atau null untuk tumbuh menurut dana saja. */
+  setGrowth: (level: number | null) => void;
   focusDistrict: (id: string) => void;
   setClockSpeed: (secondsPerHour: number) => void;
   setHour: (h: number) => void;
@@ -159,7 +161,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
     sceneRef.current = scene;
     const chips = chipsRef.current;
     onSceneRef.current?.({
-      emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), focusDistrict: (id) => scene.focusDistrict(id),
+      emit: (e) => scene.emit(e), setActivity: (v) => scene.setActivity(v), setGrowth: (g) => scene.setGrowth(g), focusDistrict: (id) => scene.focusDistrict(id),
       setClockSpeed: (s) => scene.setClockSpeed(s), setHour: (h) => scene.setHour(h), setClockPaused: (p) => scene.setClockPaused(p), clearInspect: () => scene.clearInspect(), closeBuilding: () => scene.closeBuilding(), focusFloor: (l) => scene.focusFloor(l), setWeather: (m) => scene.setWeather(m), openTownHall: () => scene.openTownHall(), resetCamera: () => scene.resetCamera(true), setPaused: (p) => scene.setPaused(p),
     });
     const shift = () => scene.setViewShift(window.innerWidth >= 768 ? shiftRef.current : 0);

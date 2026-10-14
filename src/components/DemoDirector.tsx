@@ -15,7 +15,7 @@ interface Beat { at: number; caption: string; run: (s: SceneApi) => void }
 
 const BEATS: Beat[] = [
   { at: 0, caption: "A city on Monad. Every building is a service: a position in a Monad protocol that the mayor runs for the residents.", run: (s) => { s.closeBuilding(); s.setWeather("clear"); s.setHour(7.6); s.setClockSpeed(16); s.resetCamera(); s.emit({ type: "deposit", amount: 500 }); } },
-  { at: 7, caption: "Residents deposit AUSD into the city with a passkey: no seed phrase, no gas. The city grows with its funds.", run: (s) => { s.focusDistrict("idle"); s.emit({ type: "deposit", amount: 1200 }); } },
+  { at: 7, caption: "Residents deposit AUSD into the city with a passkey: no seed phrase, no gas. The city grows with its economy.", run: (s) => { s.focusDistrict("idle"); s.emit({ type: "deposit", amount: 1200 }); } },
   { at: 14, caption: "The mayor tunes each service with a depositor's own rights there: a loop on Neverland, reward tokens on Aave, a price range on Uniswap.", run: (s) => { s.emit({ type: "transfer", from: "idle", to: "lend", amount: 1200, label: "Mayor puts funds to work" }); s.focusDistrict("lend"); } },
   { at: 23, caption: "The mayor writes rules, or switches on ready-made ones. The autopilot is a limited key: it moves and tunes the city's money, never withdraws it.", run: (s) => { s.emit({ type: "agenda", kind: "deputy", text: "Mayor allows the autopilot for 7 days" }); s.focusDistrict("vault"); } },
   { at: 30, caption: "A rule fires: the autopilot moves funds to the best rate by itself. Every move is a transaction anyone can check.", run: (s) => { s.emit({ type: "transfer", from: "lend", to: "vault", amount: 800, tone: "violet", label: "Autopilot: chase the best rate" }); } },

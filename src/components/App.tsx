@@ -15,7 +15,7 @@ import TopBar from "./TopBar";
 import DepositSheet from "./sheets/DepositSheet";
 import ExploreSheet from "./sheets/ExploreSheet";
 import FoundCitySheet from "./sheets/FoundCitySheet";
-import { DEFAULT_STYLE, encodeStyle } from "@/lib/scene/themes";
+import { DEFAULT_STYLE, encodeStyle, growthOf } from "@/lib/scene/themes";
 import MayorStrip from "./MayorStrip";
 import ManageSheet from "./sheets/ManageSheet";
 import PanggungSheet from "./sheets/PanggungSheet";
@@ -92,6 +92,10 @@ function Shell() {
     const level = crowd === null ? byFunds : Math.max(crowd, 0.5 * byFunds);
     sceneApi.current?.setActivity(0.45 + 0.75 * level);
   }, [tvl, crowd, current.mapId]);
+  // Tinggi, kepadatan, dan kelengkapan kota mengikuti skor kota (TC67.8: ekonomi dan layanan yang diurus walikota).
+  // Kota contoh dan kota tanpa skor tumbuh menurut dananya saja.
+  const growth = score ? growthOf(score.score) : null;
+  useEffect(() => { api?.setGrowth(growth); }, [api, growth, current.mapId]);
   useEffect(() => {
     // Kota contoh hidup sendiri dengan kejadian contoh, supaya layar pertama tidak kosong.
     if (!current.preview || demo) return;

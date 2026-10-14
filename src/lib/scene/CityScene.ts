@@ -101,6 +101,8 @@ export class CityScene {
   /** Perkembangan tiap distrik dan seluruh kota; kota baru dimulai dari 0 lalu tumbuh ke target. */
   private devState = new Map<string, number>();
   private cityDev = 0;
+  /** Tingkat pembangunan dari skor kota (0..1), atau null bila kota tumbuh menurut dana saja. */
+  private growth: number | null = null;
   private cityTarget = 0;
   private craneClock = 0;
   /** Jam kota: siang, malam, dan pola kegiatan harian. */
@@ -382,13 +384,40 @@ export class CityScene {
       this.districtMeshes.push({
         id: d.id, mesh, uniforms, depth, owner,
         center: new THREE.Vector3(cx, Math.min(maxHeight, 60) * 0.55, cz),
-        dev, target: developmentOf(d.assets),
+        dev, target: 0,
         bldg: keyed.map((k) => ({ id: k.bi, order: order.get(k.bi) ?? 0, x: k.bx, z: k.bz, h: this.map!.buildings[k.bi].h })),
       });
     }
-    this.cityTarget = developmentOf(districts.reduce((s, d) => s + Math.max(0, d.assets), 0));
+    this.applyTargets();
     this.applyHighlight();
     this.syncLife(districts, groups);
+  }
+
+  /**
+   * Skor kota 0..1 dari `growthOf` (TC67.8), atau null untuk kembali tumbuh menurut dana saja. Tinggi, kepadatan, dan
+   * kelengkapan kota mengikuti angka ini; bangunan naik pelan ke target baru tanpa membangun ulang mesh.
+   */
+  setGrowth(level: number | null) {
+    this.growth = level === null ? null : Math.max(0, Math.min(1, level));
+    this.applyTargets();
+  }
+
+  /**
+   * Target pembangunan. Dengan skor kota, kota keseluruhan naik ke tingkat skor (ekonomi dan layanan yang diurus walikota),
+   * dan tiap distrik sebanding dengan dana layanannya, sehingga layanan yang paling dipakai paling tinggi. Tanpa skor (kota
+   * contoh, atau relayer tidak terjangkau) kota tumbuh menurut dananya saja.
+   */
+  private applyTargets() {
+    const byFunds = new Map(this.districts.map((d) => [d.id, developmentOf(d.assets)]));
+    const total = developmentOf(this.districts.reduce((s, d) => s + Math.max(0, d.assets), 0));
+    if (this.growth === null) {
+      for (const dm of this.districtMeshes) dm.target = byFunds.get(dm.id) ?? 0;
+      this.cityTarget = total;
+      return;
+    }
+    const top = Math.max(1e-6, ...byFunds.values());
+    for (const dm of this.districtMeshes) dm.target = this.growth * ((byFunds.get(dm.id) ?? 0) / top);
+    this.cityTarget = this.growth;
   }
 
   /** Memberi tahu lapisan kehidupan di mana tiap distrik berada dan seberapa besar. */

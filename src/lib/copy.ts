@@ -37,7 +37,7 @@ const EN: Copy = {
   hero: {
     badge: "Test version on Monad · no real money",
     h1: ["A city you can save in.", "And watch grow."],
-    sub: "Put digital dollars into a city. Its mayor invests them for everyone and is paid only when you profit. The city on screen is the savings pot itself: the more money inside, the bigger it gets.",
+    sub: "Put digital dollars into a city. Its mayor invests them for everyone and is paid only when you profit. The city on screen is the savings pot itself: the busier its economy and the more services its mayor runs, the bigger it gets.",
     plain: "Like a shared savings pot, but you can walk through it.",
     ctaStart: "Start with a fingerprint", ctaEnter: "Enter the city", ctaDemo: "Watch the 80-second demo",
     stats: ["cities", "mayors", "savers", "digital dollars saved"],
@@ -48,7 +48,7 @@ const EN: Copy = {
     3: { tag: "Chapter 2", title: "Why you do not have to trust the mayor", lead: "The safety is built into the code, not into promises." },
   },
   beats: {
-    intro: { label: "What you are looking at", title: "This city is a savings pot", body: "Every city on this site is a pot of money that many people saved into together, shown as a real neighbourhood on the map. More money means a bigger city. Each district is a place where the money is put to work.", look: "Look at the map behind this card: that is the pot. The legend below tells you what each thing is." },
+    intro: { label: "What you are looking at", title: "This city is a savings pot", body: "Every city on this site is a pot of money that many people saved into together, shown as a real neighbourhood on the map. A busier economy and more services mean a bigger, taller, livelier city. Each district is a place where the money is put to work.", look: "Look at the map behind this card: that is the pot. The legend below tells you what each thing is." },
     deposit: { label: "Savers", title: "You put money in, the city grows", body: "Make an account in seconds with your fingerprint or face: no secret words to write down, no app to install. Then deposit digital dollars (called AUSD). You can take your money out any time.", look: "Little trucks bring deposits to the town square. New roads, parks and towers get built as more money arrives." },
     mayor: { label: "Mayors", title: "A mayor puts the money to work", body: "The mayor decides where the pot earns interest: lent out, or kept in a savings vault. The rules are in the code: a mayor can only move so much at once, and can never send your money to their own wallet.", look: "Trucks drive money from the town square to the blue district, where it is lent out. That is the mayor moving funds." },
     profit: { label: "Fair pay", title: "The mayor earns only when you profit", body: "The mayor takes a small cut of the profit, never of your deposit. If the pot loses value, the mayor earns nothing, and is not paid twice for winning back the same ground.", look: "The gold coins in the square are the mayor's small cut. They only appear when there is profit." },
@@ -116,7 +116,7 @@ const ID: Copy = {
   hero: {
     badge: "Versi uji di Monad · bukan uang sungguhan",
     h1: ["Kota tempat Anda menabung.", "Dan melihatnya tumbuh."],
-    sub: "Setor dolar digital ke sebuah kota. Walikotanya menginvestasikannya untuk semua penabung dan hanya dibayar kalau Anda untung. Kota di layar adalah celengannya sendiri: makin banyak uang di dalamnya, makin besar kotanya.",
+    sub: "Setor dolar digital ke sebuah kota. Walikotanya menginvestasikannya untuk semua penabung dan hanya dibayar kalau Anda untung. Kota di layar adalah celengannya sendiri: makin hidup ekonominya dan makin banyak layanan yang diurus walikotanya, makin besar kotanya.",
     plain: "Seperti celengan bersama, tapi bisa Anda jelajahi.",
     ctaStart: "Mulai dengan sidik jari", ctaEnter: "Masuk ke kota", ctaDemo: "Tonton demo 80 detik",
     stats: ["kota", "walikota", "penabung", "dolar digital ditabung"],
@@ -127,7 +127,7 @@ const ID: Copy = {
     3: { tag: "Bab 2", title: "Kenapa Anda tidak perlu percaya begitu saja pada walikota", lead: "Keamanannya tertanam di kode, bukan di janji." },
   },
   beats: {
-    intro: { label: "Yang sedang Anda lihat", title: "Kota ini adalah celengan bersama", body: "Setiap kota di situs ini adalah satu celengan yang ditabung bersama oleh banyak orang, ditampilkan sebagai lingkungan nyata di peta. Makin banyak uang, makin besar kotanya. Tiap distrik adalah tempat uang itu dikerjakan.", look: "Lihat peta di belakang kartu ini: itulah celengannya. Legenda di bawah menjelaskan arti tiap benda." },
+    intro: { label: "Yang sedang Anda lihat", title: "Kota ini adalah celengan bersama", body: "Setiap kota di situs ini adalah satu celengan yang ditabung bersama oleh banyak orang, ditampilkan sebagai lingkungan nyata di peta. Makin hidup ekonominya dan makin banyak layanannya, makin besar, tinggi, dan ramai kotanya. Tiap distrik adalah tempat uang itu dikerjakan.", look: "Lihat peta di belakang kartu ini: itulah celengannya. Legenda di bawah menjelaskan arti tiap benda." },
     deposit: { label: "Penabung", title: "Anda menabung, kota ikut tumbuh", body: "Buat akun dalam hitungan detik dengan sidik jari atau wajah: tanpa kata rahasia yang harus dicatat, tanpa aplikasi tambahan. Lalu setor dolar digital (disebut AUSD). Uang bisa Anda tarik kapan saja.", look: "Truk-truk kecil membawa setoran ke alun-alun. Jalan, taman, dan gedung baru dibangun saat uang makin banyak." },
     mayor: { label: "Walikota", title: "Walikota mengerjakan uang itu", body: "Walikota menentukan di mana celengan menghasilkan bunga: dipinjamkan, atau disimpan di brankas tabungan. Aturannya ada di kode: walikota hanya boleh memindahkan sebagian dalam sekali jalan, dan tidak pernah bisa mengirim uang Anda ke dompetnya sendiri.", look: "Truk mengantar uang dari alun-alun ke distrik biru, tempat uang dipinjamkan. Itulah walikota memindahkan dana." },
     profit: { label: "Bayaran yang adil", title: "Walikota dibayar hanya saat Anda untung", body: "Walikota mengambil bagian kecil dari keuntungan, tidak pernah dari setoran Anda. Kalau nilai celengan turun, walikota tidak dapat apa-apa, dan tidak dibayar dua kali untuk mengembalikan nilai yang sama.", look: "Koin emas di alun-alun adalah bagian kecil walikota. Koin itu hanya muncul kalau ada keuntungan." },

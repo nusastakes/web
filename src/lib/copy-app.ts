@@ -78,7 +78,7 @@ const EN = {
   intro: {
     kicker: "Welcome to Nusastakes", next: "Next", skip: "Skip", demo: "Watch the 80-second demo", explore: "Explore cities", look: "Look around",
     steps: [
-      ["Every city is a savings pool", "Residents deposit AUSD into a city. Each city is an ERC-4626 vault on Monad, and the 3D city grows with the money in it."],
+      ["Every city is a savings pool", "Residents deposit AUSD into a city. Each city is an ERC-4626 vault on Monad, and the 3D city grows with its economy: the money in it, what it earns, its visitors, and how many kinds of services the mayor runs."],
       ["The mayor runs the city", "The mayor places the funds in districts that earn yield. The mayor earns a fee only from residents' profit, and the contract never lets them send funds to their own wallet."],
       ["One passkey, no seed phrase", "Your account comes from a passkey (Mera). The same passkey also locks the mayor's sealed strategy book: plans written before the results, revealed at the end of the season."],
       ["AI staff with hard limits", "Mayors hire AI staff: Satpam (a Chainlink CRE workflow) can only pull funds back to safety, the Analyst only proposes, Humas writes the weekly report."],
@@ -164,7 +164,7 @@ const ID: typeof EN = {
   intro: {
     kicker: "Selamat datang di Nusastakes", next: "Lanjut", skip: "Lewati", demo: "Tonton demo 80 detik", explore: "Jelajahi kota", look: "Lihat-lihat",
     steps: [
-      ["Setiap kota adalah celengan bersama", "Penduduk menyetor AUSD ke sebuah kota. Tiap kota adalah vault ERC-4626 di Monad, dan kota 3D tumbuh mengikuti uang di dalamnya."],
+      ["Setiap kota adalah celengan bersama", "Penduduk menyetor AUSD ke sebuah kota. Tiap kota adalah vault ERC-4626 di Monad, dan kota 3D tumbuh mengikuti ekonominya: uang di dalamnya, penghasilannya, pengunjungnya, dan berapa jenis layanan yang diurus walikota."],
       ["Walikota menjalankan kota", "Walikota menempatkan dana di distrik yang menghasilkan bunga. Walikota hanya mendapat fee dari keuntungan penduduk, dan kontrak tidak pernah mengizinkannya mengirim dana ke dompetnya sendiri."],
       ["Satu passkey, tanpa frasa rahasia", "Akun Anda berasal dari passkey (Mera). Passkey yang sama juga mengunci buku strategi tersegel walikota: rencana ditulis sebelum hasilnya, dibuka di akhir musim."],
       ["Staf AI dengan batas keras", "Walikota menyewa staf AI: Satpam (workflow Chainlink CRE) hanya bisa menarik dana ke tempat aman, Analis hanya memberi usulan, Humas menulis laporan mingguan."],

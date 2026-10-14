@@ -112,3 +112,12 @@ export function decodeStyle(code: string | null | undefined): CityStyle {
 export function developmentOf(assets: number): number {
   return Math.max(0, Math.min(1, Math.log(1 + Math.max(0, assets) / 40) / Math.log(1 + 60000 / 40)));
 }
+
+/**
+ * Tingkat pembangunan dari skor kota 0..100 (relayer `score.mjs`, vault TC67.8: ekonomi kota dikali variasi layanan,
+ * ditambah layanan aktif). Kurva cekung supaya kota kecil tetap terlihat tumbuh: desa (5) sekitar 0,15, kota kecil (20)
+ * sekitar 0,4, kota (40) sekitar 0,64, metropolis (65) sekitar 0,9.
+ */
+export function growthOf(score: number): number {
+  return Math.max(0, Math.min(1, Math.pow(Math.max(0, score) / 75, 0.7)));
+}
