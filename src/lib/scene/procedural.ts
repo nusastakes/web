@@ -1,5 +1,6 @@
 import { DEFAULT_SIZE, parseOsmUri } from "../osm";
 import type { CityMap, MapBuilding, MapRoad } from "./geometry";
+import { tr } from "../lang";
 
 /**
  * Lahan kosong prosedural (R24): dipakai saat data peta asli sebuah area tidak bisa dimuat (server OpenStreetMap
@@ -20,7 +21,7 @@ function rng(seed: string) {
 }
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function proceduralCity(id: string, name = "Open land"): CityMap {
+export function proceduralCity(id: string, name = tr("Open land", "Lahan kosong")): CityMap {
   const at = parseOsmUri(id);
   const size = at?.size ?? DEFAULT_SIZE;
   const half = size / 2;
@@ -53,7 +54,7 @@ export function proceduralCity(id: string, name = "Open land"): CityMap {
     }
   }
   return {
-    id, name, attribution: "Procedural placeholder (map data unavailable)",
+    id, name, attribution: tr("Procedural placeholder (map data unavailable)", "Peta pengganti prosedural (data peta tidak tersedia)"),
     center: at ? [at.lon, at.lat] : [0, 0],
     bounds: [-half, -half, half, half],
     buildings, roads, fallback: true,

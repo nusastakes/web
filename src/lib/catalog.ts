@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { keccak256, toHex } from "viem";
 import { ADDR, RELAYER_URL, SOURCE_ID } from "./config";
+import { currentLang, type Lang } from "./lang";
 import type { DistrictKind, Hex } from "./types";
 
 /**
@@ -69,9 +70,18 @@ const SEEDS: Seed[] = [
   { id: "kintsu-smon", name: "Kintsu · sMON (staking MON)", protocol: "Kintsu", category: "staking", asset: "MON", pool: "73c511a9-4dc0-4397-babe-e578fd75f0dd", apyBps: 1702, tvlUsd: 1_799_864 },
 ];
 
+/**
+ * Nama layanan menurut bahasa toggle: nama protokol dan token tetap, hanya keterangan dalam kurung yang diterjemahkan.
+ * Objek layanan memakai getter `name`, jadi nama ikut berganti saat toggle bahasa berubah.
+ */
+export function serviceName(name: string, lang: Lang = currentLang()): string {
+  if (lang === "en") return name;
+  return name.replace("(fixed rate)", "(bunga tetap)").replace("(volatile)", "(harga bergejolak)");
+}
+
 export function staticCatalog(): Service[] {
   return SEEDS.map((s) => ({
-    id: s.id, name: s.name, protocol: s.protocol, category: s.category, asset: s.asset,
+    id: s.id, get name() { return serviceName(s.name); }, protocol: s.protocol, category: s.category, asset: s.asset,
     impl: s.id === "morpho-grove" ? ADDR.mirrorAdapterImpl : null,
     sourceId: s.sourceId ?? sid(s.pool), apyBps: s.apyBps, tvlUsd: s.tvlUsd, observedAt: null, pool: s.pool, live: false,
   }));
@@ -95,9 +105,10 @@ function merge(rows: RelayerService[]): Service[] {
     const s = base.get(r.id);
     const category = CATS.has(String(r.category)) ? (r.category as ServiceCategory) : s?.category;
     if (!category) continue;
+    const rawName = SEEDS.find((x) => x.id === r.id)?.name ?? String(r.name ?? r.id).slice(0, 60);
     out.push({
       id: r.id,
-      name: s?.name ?? String(r.name ?? r.id).slice(0, 60),
+      get name() { return serviceName(rawName); },
       protocol: s?.protocol ?? String(r.protocol ?? r.id).slice(0, 40),
       category, asset: (r.asset === "MON" ? "MON" : s?.asset ?? "AUSD"),
       impl: isAddr(r.impl) ? r.impl : s?.impl ?? null,

@@ -1,5 +1,6 @@
 import { hash01, type CityMap } from "./geometry";
 import type { RoadGraph } from "./roadgraph";
+import { tr } from "../lang";
 
 /**
  * Tempat di kota: rumah, kantor, toko dan warung, serta fasilitas umum, ditebak dari tinggi, kelas, dan letak bangunan
@@ -23,11 +24,12 @@ export interface Place {
   out: { x: number; z: number };
 }
 
-const FOOD = ["Warung Bu Sri", "Bakso Pak Darto", "Sate Madura Cak Ali", "Kopi Senja", "Nasi Padang Minang", "Mie Ayam Mas Bejo", "Soto Betawi Bang Udin", "Martabak Manis Cahaya", "Gudeg Bu Tini", "Ayam Geprek Mbak Rara", "Es Teh Manis Nusantara", "Roti Bakar Mas Dodi", "Pecel Lele Lamongan", "Seblak Teh Rina", "Kedai Kopi Lentera"];
-const SHOP = ["Toko Maju Jaya", "Apotek Sehat", "Minimarket 24", "Toko Kelontong Berkah", "Laundry Kilat", "Bengkel Motor Sinar", "Toko Buku Pelangi", "Konter Pulsa Abadi", "Toko Bangunan Sentosa", "Butik Kebaya Ayu", "Optik Terang Jaya", "Toko Roti Harum"];
-const OFFICE = ["Menara Nusa", "Graha Samudra", "Wisma Cakrawala", "Plaza Arunika", "Tower Cendana", "Gedung Bahari Raya", "Menara Lintang", "Graha Pertiwi Nusa", "Sentral Niaga Nusastakes", "Wisma Kencana Biru"];
-const CIVIC = ["SD Negeri 03", "Masjid Al-Ikhlas", "Puskesmas Kecamatan", "Kantor Kelurahan", "SMP Negeri 12", "Perpustakaan Kota", "Gereja Santo Yosef", "Klinik Pratama"];
-const HOME = ["Rumah Pak Budi", "Kos Melati", "Apartemen Taman Sari", "Rumah Bu Ani", "Kontrakan Hijau", "Rumah Keluarga Siregar", "Kos Putri Mawar", "Rumah Pak Made", "Apartemen Kemang Asri", "Rumah Oma Lien"];
+/** Nama fiktif per jenis tempat: [Inggris, Indonesia]. Nama dipilih saat ditampilkan, mengikuti bahasa yang dipakai. */
+const FOOD: [string, string][] = [["Bu Sri's Food Stall", "Warung Bu Sri"], ["Pak Darto's Meatball Soup", "Bakso Pak Darto"], ["Cak Ali's Madura Satay", "Sate Madura Cak Ali"], ["Sunset Coffee", "Kopi Senja"], ["Minang Padang Rice", "Nasi Padang Minang"], ["Mas Bejo's Chicken Noodles", "Mie Ayam Mas Bejo"], ["Bang Udin's Betawi Soup", "Soto Betawi Bang Udin"], ["Cahaya Sweet Pancakes", "Martabak Manis Cahaya"], ["Bu Tini's Gudeg", "Gudeg Bu Tini"], ["Mbak Rara's Smashed Chicken", "Ayam Geprek Mbak Rara"], ["Nusantara Sweet Tea", "Es Teh Manis Nusantara"], ["Mas Dodi's Toast", "Roti Bakar Mas Dodi"], ["Lamongan Fried Catfish", "Pecel Lele Lamongan"], ["Teh Rina's Seblak", "Seblak Teh Rina"], ["Lantern Coffee House", "Kedai Kopi Lentera"]];
+const SHOP: [string, string][] = [["Maju Jaya Store", "Toko Maju Jaya"], ["Sehat Pharmacy", "Apotek Sehat"], ["Minimarket 24", "Minimarket 24"], ["Berkah Grocery", "Toko Kelontong Berkah"], ["Express Laundry", "Laundry Kilat"], ["Sinar Motorbike Repair", "Bengkel Motor Sinar"], ["Rainbow Bookshop", "Toko Buku Pelangi"], ["Abadi Phone Credit", "Konter Pulsa Abadi"], ["Sentosa Hardware", "Toko Bangunan Sentosa"], ["Ayu Kebaya Boutique", "Butik Kebaya Ayu"], ["Terang Jaya Optician", "Optik Terang Jaya"], ["Harum Bakery", "Toko Roti Harum"]];
+const OFFICE: [string, string][] = [["Nusa Tower", "Menara Nusa"], ["Samudra House", "Graha Samudra"], ["Cakrawala Building", "Wisma Cakrawala"], ["Arunika Plaza", "Plaza Arunika"], ["Cendana Tower", "Tower Cendana"], ["Bahari Raya Building", "Gedung Bahari Raya"], ["Lintang Tower", "Menara Lintang"], ["Pertiwi Nusa House", "Graha Pertiwi Nusa"], ["Nusastakes Trade Centre", "Sentral Niaga Nusastakes"], ["Kencana Biru Building", "Wisma Kencana Biru"]];
+const CIVIC: [string, string][] = [["State Primary School 03", "SD Negeri 03"], ["Al-Ikhlas Mosque", "Masjid Al-Ikhlas"], ["District Health Centre", "Puskesmas Kecamatan"], ["Village Office", "Kantor Kelurahan"], ["State Junior High School 12", "SMP Negeri 12"], ["City Library", "Perpustakaan Kota"], ["St Joseph's Church", "Gereja Santo Yosef"], ["Primary Clinic", "Klinik Pratama"]];
+const HOME: [string, string][] = [["Pak Budi's House", "Rumah Pak Budi"], ["Melati Boarding House", "Kos Melati"], ["Taman Sari Apartments", "Apartemen Taman Sari"], ["Bu Ani's House", "Rumah Bu Ani"], ["Green Rental House", "Kontrakan Hijau"], ["Siregar Family Home", "Rumah Keluarga Siregar"], ["Mawar Women's Boarding House", "Kos Putri Mawar"], ["Pak Made's House", "Rumah Pak Made"], ["Kemang Asri Apartments", "Apartemen Kemang Asri"], ["Oma Lien's House", "Rumah Oma Lien"]];
 
 export function findPlaces(map: CityMap, g: RoadGraph): Place[] {
   const out: Place[] = [];
@@ -51,7 +53,8 @@ export function findPlaces(map: CityMap, g: RoadGraph): Place[] {
     else if ((b.c === 1 || p.d < 30) && r < 0.32) kind = r < 0.17 ? "food" : "shop";
     else kind = "home";
     const names = kind === "food" ? FOOD : kind === "shop" ? SHOP : kind === "office" ? OFFICE : kind === "civic" ? CIVIC : HOME;
-    const name = names[counters[kind]++ % names.length] + (counters[kind] > names.length ? ` ${Math.ceil(counters[kind] / names.length)}` : "");
+    const [en, id] = names[counters[kind]++ % names.length];
+    const suffix = counters[kind] > names.length ? ` ${Math.ceil(counters[kind] / names.length)}` : "";
     // Pintu: titik terdekat di dinding ke simpul trotoar, sedikit di luar dinding.
     const px = g.x[p.node] ?? x, pz = g.z[p.node] ?? z;
     let best = { x, z, d: Infinity };
@@ -64,7 +67,7 @@ export function findPlaces(map: CityMap, g: RoadGraph): Place[] {
     }
     const ol = Math.hypot(px - best.x, pz - best.z) || 1;
     const ox = (px - best.x) / ol, oz = (pz - best.z) / ol;
-    out.push({ kind, name, x, z, veh: v.node, ped: p.node, building: i, door: { x: best.x + ox * 0.6, z: best.z + oz * 0.6 }, out: { x: ox, z: oz } });
+    out.push({ kind, get name() { return tr(en, id) + suffix; }, x, z, veh: v.node, ped: p.node, building: i, door: { x: best.x + ox * 0.6, z: best.z + oz * 0.6 }, out: { x: ox, z: oz } });
   });
   return out;
 }

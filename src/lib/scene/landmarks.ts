@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { CityMap } from "./geometry";
 import { box, merge, part, toonRamp } from "./props";
+import { currentLang, tr } from "../lang";
 
 /**
  * Penanda kota yang membuat gedung terasa dipakai: layar LED (videotron) di menara dekat alun-alun yang menayangkan
@@ -13,12 +14,13 @@ export interface ScreenInfo { name: string; tvl: number; apy: number | null; tim
 
 interface Face { cx: number; cz: number; nx: number; nz: number; len: number }
 
-const ADS: { bg: string; fg: string; title: string; line: string }[] = [
-  { bg: "#3f6bff", fg: "#ffffff", title: "NABUNG DI KOTAMU", line: "Panen hasil bareng tetangga" },
-  { bg: "#f6c445", fg: "#2a2f55", title: "KOPI SENJA", line: "Ngopi dulu biar waras" },
-  { bg: "#e8553d", fg: "#ffffff", title: "PASAR MALAM", line: "Tiap malam mulai 18.00" },
-  { bg: "#10b3a3", fg: "#ffffff", title: "MARTABAK CAHAYA", line: "Manis, tebal, 24 jam" },
-  { bg: "#7a5cff", fg: "#ffffff", title: "BUS KOTA N1", line: "Keliling kota tiap 4 menit" },
+/** Iklan papan reklame: teks [Inggris, Indonesia], dilukis saat papan dibuat (ikut bahasa saat kota dibangun). */
+const ADS: { bg: string; fg: string; title: [string, string]; line: [string, string] }[] = [
+  { bg: "#3f6bff", fg: "#ffffff", title: ["SAVE IN YOUR CITY", "NABUNG DI KOTAMU"], line: ["Earn together with your neighbours", "Panen hasil bareng tetangga"] },
+  { bg: "#f6c445", fg: "#2a2f55", title: ["SUNSET COFFEE", "KOPI SENJA"], line: ["Coffee first, then everything else", "Ngopi dulu biar waras"] },
+  { bg: "#e8553d", fg: "#ffffff", title: ["NIGHT MARKET", "PASAR MALAM"], line: ["Every night from 18:00", "Tiap malam mulai 18.00"] },
+  { bg: "#10b3a3", fg: "#ffffff", title: ["CAHAYA PANCAKES", "MARTABAK CAHAYA"], line: ["Sweet, thick, open 24 hours", "Manis, tebal, 24 jam"] },
+  { bg: "#7a5cff", fg: "#ffffff", title: ["CITY BUS N1", "BUS KOTA N1"], line: ["Around the city every 4 minutes", "Keliling kota tiap 4 menit"] },
 ];
 
 function makeCanvas(w: number, h: number): HTMLCanvasElement {
@@ -107,9 +109,9 @@ export class Landmarks {
       ctx.fillStyle = ad.fg;
       ctx.font = "bold 30px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(ad.title, 128, 58);
+      ctx.fillText(tr(...ad.title), 128, 58);
       ctx.font = "18px system-ui, sans-serif";
-      ctx.fillText(ad.line, 128, 92);
+      ctx.fillText(tr(...ad.line), 128, 92);
       const tex = new THREE.CanvasTexture(cvs);
       tex.colorSpace = THREE.SRGBColorSpace;
       const g = new THREE.Group();
@@ -190,15 +192,16 @@ export class Landmarks {
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 20px system-ui, sans-serif";
-    ctx.fillText("LIVE", W - 58, 47);
+    ctx.fillText(tr("LIVE", "LANGSUNG"), W - (currentLang() === "id" ? 90 : 58), 47);
     ctx.font = "bold 58px system-ui, sans-serif";
     ctx.fillStyle = "#d8f59a";
-    ctx.fillText(`${Math.round(info.tvl).toLocaleString("en-US")} AUSD`, 22, 126);
+    ctx.fillText(`${Math.round(info.tvl).toLocaleString(currentLang() === "id" ? "id-ID" : "en-US")} AUSD`, 22, 126);
     ctx.font = "22px system-ui, sans-serif";
     ctx.fillStyle = "#cfd8ff";
-    ctx.fillText(`Yield ${info.apy === null ? "—" : (info.apy / 100).toFixed(2) + "% APY"}  ·  ${info.people} people out  ·  ${info.trips} trips today`, 22, 170);
+    const apy = info.apy === null ? "—" : (info.apy / 100).toFixed(2) + "% APY";
+    ctx.fillText(tr(`Yield ${apy}  ·  ${info.people} people out  ·  ${info.trips} trips today`, `Imbal hasil ${apy}  ·  ${info.people} orang di luar  ·  ${info.trips} perjalanan hari ini`), 22, 170);
     // Teks berjalan.
-    const msgs = ["Bus N1 every few minutes", "Night market opens 18:00", "Your city, your savings", "Simulated yield on testnet", `${info.phase} · ${info.time}`];
+    const msgs = [tr("Bus N1 every few minutes", "Bus N1 tiap beberapa menit"), tr("Night market opens 18:00", "Pasar malam buka 18.00"), tr("Your city, your savings", "Kotamu, tabunganmu"), tr("Simulated yield on testnet", "Imbal hasil simulasi di testnet"), `${info.phase} · ${info.time}`];
     const msg = msgs[Math.floor(t / 4) % msgs.length];
     ctx.fillStyle = night > 0.5 ? "#f6c445" : "#ffffff";
     ctx.font = "bold 24px system-ui, sans-serif";

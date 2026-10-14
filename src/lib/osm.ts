@@ -1,4 +1,6 @@
 import { RELAYER_URL } from "./config";
+import { tr } from "./lang";
+import { loc } from "./l10n";
 import type { CityMap, MapBuilding, MapRoad } from "./scene/geometry";
 
 /**
@@ -94,7 +96,7 @@ async function overpass(query: string): Promise<OverpassWay[]> {
       timers.forEach(clearTimeout);
     }
   }
-  throw new Error(`OpenStreetMap servers are busy (${last instanceof Error ? last.message : String(last)}). Try again in a minute.`);
+  throw new Error(loc(`OpenStreetMap servers are busy (${last instanceof Error ? last.message : String(last)}). Try again in a minute.`));
 }
 
 /** Batas jumlah area tutupan lahan per kota (yang terluas didahulukan) dan titik per area, supaya muatan dan geometri kecil. */
@@ -137,7 +139,7 @@ function simplifyRing(ring: [number, number][], max: number): [number, number][]
 export type BuildStage = "fetch" | "shape" | "ready";
 
 /** Mengambil dan menyusun peta kota sekitar (lat, lon), kotak `size` meter. `onStage` melaporkan tahapnya. */
-export async function buildOsmCity(lat: number, lon: number, name = "OpenStreetMap area", size = DEFAULT_SIZE, onStage?: (stage: BuildStage, ways?: number) => void): Promise<CityMap> {
+export async function buildOsmCity(lat: number, lon: number, name = tr("OpenStreetMap area", "Area OpenStreetMap"), size = DEFAULT_SIZE, onStage?: (stage: BuildStage, ways?: number) => void): Promise<CityMap> {
   onStage?.("fetch");
   const HALF = size / 2;
   const kx = 111320 * Math.cos((lat * Math.PI) / 180), kz = 110574;
@@ -210,7 +212,7 @@ export async function buildOsmCity(lat: number, lon: number, name = "OpenStreetM
   }
   areas.sort((a, b) => b.a - a.a);
   areas.length = Math.min(areas.length, MAX_AREAS);
-  if (buildings.length < 5) throw new Error("There are almost no buildings mapped here. Try a busier place.");
+  if (buildings.length < 5) throw new Error(loc("There are almost no buildings mapped here. Try a busier place."));
   if (buildings.length > MAX_BUILDINGS) {
     buildings.sort((a, b) => Math.hypot(a.p[0], a.p[1]) - Math.hypot(b.p[0], b.p[1]));
     buildings.length = MAX_BUILDINGS;
@@ -264,7 +266,7 @@ export interface PlaceHit { name: string; lat: number; lon: number }
 export async function searchPlaces(q: string): Promise<PlaceHit[]> {
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`Place search failed (${res.status}).`);
+  if (!res.ok) throw new Error(loc(`Place search failed (${res.status}).`));
   const rows = (await res.json()) as { display_name: string; lat: string; lon: string }[];
   return rows.map((r) => ({ name: r.display_name.split(",").slice(0, 3).join(","), lat: Number(r.lat), lon: Number(r.lon) }));
 }

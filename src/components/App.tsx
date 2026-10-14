@@ -102,7 +102,7 @@ function Shell() {
     const script: Parameters<NonNullable<typeof sceneApi.current>["emit"]>[0][] = [
       { type: "transfer", from: "idle", to: "lend", amount: 1200 },
       { type: "deposit", amount: 500 },
-      { type: "festival", at: "vault", label: "Sample event" },
+      { type: "festival", at: "vault", label: APP[lang].sampleEvent },
       { type: "transfer", from: "lend", to: "vault", amount: 800 },
       { type: "harvest", amount: 12.4 },
       { type: "withdraw", amount: 300 },
@@ -111,7 +111,7 @@ function Shell() {
     const first = window.setTimeout(() => sceneApi.current?.emit(script[i++ % script.length]), 3000);
     const id = window.setInterval(() => sceneApi.current?.emit(script[i++ % script.length]), 11000);
     return () => { window.clearTimeout(first); window.clearInterval(id); };
-  }, [current.preview, current.id, demo]);
+  }, [current.preview, current.id, demo, lang]);
 
   const { style, code: styleCode, save: saveStyle, sync: styleSync, error: styleError } = useCityStyle(current.vault ?? current.id, current.preview ? undefined : current.vault, wallet);
 

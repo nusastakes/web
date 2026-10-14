@@ -4,11 +4,13 @@ import { useEffect, useRef } from "react";
 import { assignDistricts } from "@/lib/scene/assign";
 import type { CityMap } from "@/lib/scene/geometry";
 import { DISTRICT_COLORS } from "@/lib/palette";
+import { useLang } from "@/lib/lang";
 import type { District } from "@/lib/types";
 
 /** Peta 2D kota untuk perangkat tanpa WebGL: tapak bangunan berwarna per distrik dan jalan. */
 export default function CityMap2D({ map, districts }: { map: CityMap; districts: District[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [lang] = useLang();
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -52,5 +54,5 @@ export default function CityMap2D({ map, districts }: { map: CityMap; districts:
     ro.observe(c);
     return () => ro.disconnect();
   }, [map, districts]);
-  return <canvas ref={ref} className="block h-full w-full" aria-label="City map" />;
+  return <canvas ref={ref} className="block h-full w-full" aria-label={lang === "id" ? "Peta kota" : "City map"} />;
 }

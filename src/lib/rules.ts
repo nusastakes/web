@@ -1,6 +1,8 @@
 "use client";
 
 import { RELAYER_URL } from "./config";
+import { currentLang, type Lang } from "./lang";
+import { loc } from "./l10n";
 import type { Hex } from "./types";
 
 /**
@@ -38,7 +40,7 @@ export interface Preset { id: string; name: string; description: string; rules: 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${RELAYER_URL}${path}`, init);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error || `Relayer error (${res.status})`);
+  if (!res.ok) throw new Error((data as { error?: string }).error || loc(`Relayer error (${res.status})`));
   return data as T;
 }
 
@@ -59,5 +61,56 @@ export const FALLBACK_PRESETS: Preset[] = [
   { id: "recenter", name: "Re-centre the Uniswap range", description: "When the MON price leaves the Uniswap position's range, re-centre the range on the current price.", rules: [{ id: "recenter", name: "Re-centre", enabled: true, when: { metric: "outOfRange", service: "uniswap-wmon-usdc", op: ">", value: 0 }, then: { action: "tune", service: "uniswap-wmon-usdc", set: { recenter: true } }, cooldownMin: 30 }] },
   { id: "unwind-loop", name: "Unwind a losing loop", description: "When borrowing on Neverland costs more than the deposit earns, take the loop back to 1x.", rules: [{ id: "unwind-loop", name: "Unwind loop", enabled: true, when: { metric: "loopSpread", service: "neverland-ausd", op: "<", value: 0 }, then: { action: "tune", service: "neverland-ausd", set: { loopX100: 100 } }, cooldownMin: 60 }] },
 ];
+
+/** Nama dan deskripsi aturan siap pakai dalam dua bahasa (relayer hanya mengirim bahasa Inggris), menurut id preset. */
+const PRESET_TEXT: Record<string, { en: { name: string; description: string }; id: { name: string; description: string } }> = {
+  "chase-apy": {
+    en: { name: "Chase the best rate", description: "When the worst funded service earns more than 1 point less than the best one, move a quarter of it to the best." },
+    id: { name: "Kejar bunga terbaik", description: "Bila layanan berdana yang paling lemah menghasilkan lebih dari 1 poin di bawah yang terbaik, pindahkan seperempatnya ke yang terbaik." },
+  },
+  "keep-cash-20": {
+    en: { name: "Keep about 20% cash", description: "Below 15% cash, bring 10% of the largest service back to cash; above 30% cash, put 10% of the cash to work in the best service." },
+    id: { name: "Jaga kas sekitar 20%", description: "Di bawah 15% kas, tarik 10% dari layanan terbesar kembali ke kas; di atas 30% kas, taruh 10% kas di layanan terbaik." },
+  },
+  brake: {
+    en: { name: "Brake when a rate collapses", description: "When a funded service earns less than 3% a year, bring half of it back to cash." },
+    id: { name: "Rem saat bunga anjlok", description: "Bila layanan berdana menghasilkan kurang dari 3% setahun, tarik separuhnya kembali ke kas." },
+  },
+  recenter: {
+    en: { name: "Re-centre the Uniswap range", description: "When the MON price leaves the Uniswap position's range, re-centre the range on the current price." },
+    id: { name: "Pusatkan ulang rentang Uniswap", description: "Bila harga MON keluar dari rentang posisi Uniswap, pusatkan ulang rentang pada harga sekarang." },
+  },
+  "unwind-loop": {
+    en: { name: "Unwind a losing loop", description: "When borrowing on Neverland costs more than the deposit earns, take the loop back to 1x." },
+    id: { name: "Lepas looping yang merugi", description: "Bila bunga pinjam di Neverland lebih mahal dari hasil simpanannya, kembalikan looping ke 1x." },
+  },
+};
+
+/** Pasangan nama aturan bawaan [Inggris, Indonesia]; nama yang ditulis walikota sendiri dibiarkan apa adanya. */
+const RULE_NAMES: [string, string][] = [
+  ["Chase the best rate", "Kejar bunga terbaik"],
+  ["Refill cash", "Isi ulang kas"],
+  ["Put idle cash to work", "Kerjakan kas yang menganggur"],
+  ["Brake", "Rem"],
+  ["Re-centre", "Pusatkan ulang"],
+  ["Unwind loop", "Lepas looping"],
+];
+
+/** Nama aturan dalam bahasa toggle bila itu nama aturan bawaan (dari bahasa mana pun); nama lain dikembalikan apa adanya. */
+export function ruleName(name: string, lang: Lang = currentLang()): string {
+  const pair = RULE_NAMES.find(([en, id]) => en === name || id === name);
+  return pair ? (lang === "id" ? pair[1] : pair[0]) : name;
+}
+
+/** Aturan siap pakai dalam bahasa toggle: nama, deskripsi, dan nama aturan di dalamnya. Pakai untuk daftar preset di RulesSheet. */
+export function localizePreset(p: Preset, lang: Lang = currentLang()): Preset {
+  const t = PRESET_TEXT[p.id]?.[lang];
+  return {
+    ...p,
+    name: t?.name ?? ruleName(p.name, lang),
+    description: t?.description ?? p.description,
+    rules: p.rules.map((r) => ({ ...r, name: ruleName(r.name, lang) })),
+  };
+}
 
 export const RULES_DOMAIN = { name: "Nusastakes", version: "1", chainId: 10143 } as const;

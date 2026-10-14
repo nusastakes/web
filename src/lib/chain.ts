@@ -1,9 +1,10 @@
-import { loadCatalog, serviceBySource, CATEGORY_KIND } from "./catalog";
+import { loadCatalog, serviceBySource, serviceName, CATEGORY_KIND } from "./catalog";
 import { parseOsmUri } from "./osm";
 import { createPublicClient } from "viem";
 import { adapterAbi, apyFeedAbi, erc20Abi, factoryAbi, tunedAdapterAbi, vaultAbi } from "./abis";
 import { ADDR, SOURCE_ID, monadTestnet, rpcTransport } from "./config";
 import { ausdToNumber } from "./format";
+import { term, tr } from "./lang";
 import type { CityView, District, Hex } from "./types";
 
 export const publicClient = createPublicClient({
@@ -101,7 +102,7 @@ export async function loadCities(): Promise<CityView[]> {
       const sum = idle + adapters.reduce((s, a) => s + a.assets, 0n);
       const w = (v: bigint) => (sum === 0n ? 0 : Number(v) / Number(sum));
       const districts: District[] = [
-        { id: "idle", kind: "idle", label: "Plaza", weight: sum === 0n ? 1 : w(idle), assets: ausdToNumber(idle), apyBps: null, simulated: false },
+        { id: "idle", kind: "idle", get label() { return term("plaza"); }, weight: sum === 0n ? 1 : w(idle), assets: ausdToNumber(idle), apyBps: null, simulated: false },
         ...adapters.map((a, i): District => {
           // Adapter bersetelan memakai kunci feed miliknya sendiri (APY efektif dari setelan kota); layanannya dikenali
           // lewat `baseSourceId`. Sebelum keeper menulis kunci itu, APY dasar katalog yang ditampilkan.
@@ -112,7 +113,7 @@ export async function loadCities(): Promise<CityView[]> {
           // Adapter cermin yang dikenal katalog menjadi layanan protokol (Bank, Brankas, Menara Staking, Pasar); lainnya seperti dulu.
           if (svc && a.simulated) {
             return {
-              id: a.address, kind: CATEGORY_KIND[svc.category], label: svc.name, protocol: svc.protocol,
+              id: a.address, kind: CATEGORY_KIND[svc.category], get label() { return serviceName(svc.name); }, protocol: svc.protocol,
               weight: w(a.assets), assets: ausdToNumber(a.assets), apyBps, simulated: true, adapter: a.address,
               serviceId: svc.id, category: svc.category, protocolTvlUsd: svc.tvlUsd, tunable: tuned, quarantined: a.quarantined,
             };
@@ -120,8 +121,11 @@ export async function loadCities(): Promise<CityView[]> {
           return {
             id: a.address,
             kind: a.simulated ? "lending" : "vault",
-            label: a.simulated ? (adapters.filter((x) => x.simulated).length > 1 ? `Lending district ${i + 1}` : "Lending district") : "Vault district",
-            protocol: a.simulated ? apy?.label || "Mirrored mainnet APY" : "ERC-4626 vault",
+            get label() {
+              if (!a.simulated) return tr("Vault district", "Distrik brankas");
+              return adapters.filter((x) => x.simulated).length > 1 ? tr(`Lending district ${i + 1}`, `Distrik pinjaman ${i + 1}`) : tr("Lending district", "Distrik pinjaman");
+            },
+            protocol: a.simulated ? apy?.label || tr("Mirrored mainnet APY", "APY cermin mainnet") : tr("ERC-4626 vault", "Vault ERC-4626"),
             weight: w(a.assets),
             assets: ausdToNumber(a.assets),
             apyBps: apy?.apyBps ?? null,

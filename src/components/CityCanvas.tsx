@@ -8,7 +8,7 @@ import type { CityStyle } from "@/lib/scene/themes";
 import type { InteriorInfo } from "@/lib/scene/interior";
 import type { District } from "@/lib/types";
 import { DISTRICT_COLORS } from "@/lib/palette";
-import { APP } from "@/lib/copy-app";
+import { APP, districtName } from "@/lib/copy-app";
 import { useLang } from "@/lib/lang";
 import CityMap2D from "./CityMap2D";
 
@@ -227,7 +227,7 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
 
   return (
     <div className="absolute inset-0">
-      <canvas ref={canvasRef} className="block h-full w-full touch-none cursor-grab active:cursor-grabbing" aria-label="3D city" />
+      <canvas ref={canvasRef} className="block h-full w-full touch-none cursor-grab active:cursor-grabbing" aria-label={APP[lang].canvasAria} />
       {/* Label distrik: posisinya ditulis langsung ke DOM tiap frame, tanpa render ulang React. */}
       {/* Pin kejadian (truk bermuatan, acara, usulan): dibuat langsung di DOM, posisinya ditulis tiap frame. */}
       <div ref={floatersRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
@@ -244,13 +244,13 @@ export default function CityCanvas({ mapId, districts, selectedId, onSelect, onM
               style={{ outline: hovered === d.id || selectedId === d.id ? `2px solid ${DISTRICT_COLORS[d.kind]}` : "none" }}
             >
               <span className="h-2 w-2 rounded-full" style={{ background: DISTRICT_COLORS[d.kind] }} />
-              {d.label}
+              {districtName(lang, d)}
             </div>
           </div>
         ))}
       </div>
       {!ready && !error && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">Building the city…</div>
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">{APP[lang].building3d}</div>
       )}
       {ready && placeholder && !error && !quiet && (
         <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { vaultAbi } from "@/lib/abis";
 import { contractTx } from "@/lib/actions";
 import { humanError } from "@/lib/errors";
@@ -54,7 +54,7 @@ export default function CityPanel({ city, selectedId, onSelect, me, onTune }: Pr
   const selected = city.districts.find((d) => d.id === selectedId) ?? null;
   const isMayor = me && city.mayor && me.toLowerCase() === city.mayor.toLowerCase();
   const nowSec = useNowSeconds();
-  const [report, setReport] = useState<{ city: string; text: string } | null>(null);
+  const [report, setReport] = useState<{ city: string; text: string; lang?: string } | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const w = useWallet();
   const [restore, setRestore] = useState<{ id: string; busy: boolean; msg?: string; error?: string } | null>(null);
@@ -73,16 +73,27 @@ export default function CityPanel({ city, selectedId, onSelect, me, onTune }: Pr
     if (report?.city === city.vault) { setReport(null); return; }
     setLoadingReport(true);
     try {
-      const r = await getReport(city.vault, 7);
+      const r = await getReport(city.vault, 7, lang);
       const text = typeof r.text === "string" ? r.text.replace(/\*\*/g, "")
         : r.status === "not-hired" ? t.notHired : t.noReport;
-      setReport({ city: city.vault, text });
+      setReport({ city: city.vault, text, lang });
     } catch {
       // Laporan ditulis ulang oleh LLM di relayer; permintaan pertama bisa lama dan terputus di proxy.
       setReport({ city: city.vault, text: t.writing });
     }
     finally { setLoadingReport(false); }
   };
+  // Laporan yang sedang terbuka diambil ulang dalam bahasa baru saat toggle berubah (relayer `?lang=`).
+  const reportStale = !!report && !!city.vault && report.city === city.vault && !!report.lang && report.lang !== lang;
+  useEffect(() => {
+    if (!reportStale || !city.vault) return;
+    let cancelled = false;
+    const vault = city.vault;
+    getReport(vault, 7, lang).then((r) => {
+      if (!cancelled && typeof r.text === "string") setReport({ city: vault, text: r.text.replace(/\*\*/g, ""), lang });
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [reportStale, city.vault, lang]);
 
   return (
     <Card className="pointer-events-auto flex max-h-full w-full flex-col overflow-hidden max-sm:bg-white/97! sm:w-[340px]">

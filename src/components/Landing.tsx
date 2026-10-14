@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import brand from "@/lib/brand.json";
 import { COPY } from "@/lib/copy";
 import { fmtAusd, shortAddr } from "@/lib/format";
-import { useLang } from "@/lib/lang";
+import { tr, useLang } from "@/lib/lang";
 import { PREVIEW_CITIES } from "@/lib/preview";
 import { getLeaderboard, getMetrics, type LeaderRow } from "@/lib/relayer";
 import { useWallet } from "@/lib/wallet";
@@ -98,12 +98,12 @@ export default function Landing() {
       case "passkey": setFund(1); s.setHour(19.6); s.focusDistrict("idle"); s.emit({ type: "fireworks" }); break;
       case "book":
         setFund(1); s.setHour(11.5); s.openTownHall();
-        s.emit({ type: "agenda", kind: "seal", text: "Mayor writes a sealed plan in the strategy book" });
+        s.emit({ type: "agenda", kind: "seal", text: tr("Mayor writes a sealed plan in the strategy book", "Walikota menulis rencana tersegel di buku strategi") });
         break;
       case "staff":
         setFund(1); s.setHour(12.5); s.openTownHall(); s.focusFloor(2);
         later(2500, () => s.emit({ type: "propose", id: "story", from: "lend", to: "vault", amount: 800 }));
-        later(8000, () => s.emit({ type: "alert", at: "lend", amount: 900, label: "Satpam: evacuating Lending district" }));
+        later(8000, () => s.emit({ type: "alert", at: "lend", amount: 900, label: tr("Security Guard: evacuating the lending district", "Satpam: mengevakuasi distrik pinjaman") }));
         break;
     }
   }, []);
@@ -164,7 +164,7 @@ export default function Landing() {
     const script = [
       () => api.current?.emit({ type: "deposit", amount: 500 }),
       () => api.current?.emit({ type: "transfer", from: "idle", to: "lend", amount: 1200 }),
-      () => api.current?.emit({ type: "festival", at: "vault", label: "Mayor's event" }),
+      () => api.current?.emit({ type: "festival", at: "vault", label: tr("Mayor's event", "Acara walikota") }),
       () => api.current?.emit({ type: "harvest", amount: 12.4 }),
     ];
     let i = 0;

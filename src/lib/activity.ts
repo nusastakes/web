@@ -5,6 +5,7 @@ import { zeroAddress } from "viem";
 import { guardianAbi, vaultAbi } from "./abis";
 import { publicClient } from "./chain";
 import { ADDR } from "./config";
+import { term, tr } from "./lang";
 import type { LifeEvent } from "./scene/life";
 import type { Hex } from "./types";
 
@@ -13,7 +14,8 @@ const POLL_MS = 2500;
 const MAX_SPAN = 99n;
 const district = (a: string) => (a.toLowerCase() === zeroAddress ? "idle" : a);
 const ausd = (raw: bigint) => Number(raw) / 1e6;
-const ROLE_NAMES: Record<number, string> = { 1: "Satpam (AI guard)", 2: "Analyst (AI)", 3: "Humas (AI reporter)" };
+/** Nama peran staf AI menurut bahasa toggle, dibaca saat kejadian dibuat. */
+const roleName = (role: number): string => (({ 1: term("guard"), 2: term("analyst"), 3: term("pr") }) as Record<number, string>)[role] ?? term("aiStaff");
 
 /**
  * Mengubah kejadian onchain milik satu kota menjadi kejadian visual di kota 3D: setor, tarik, tata ulang, fee,
@@ -60,19 +62,19 @@ export function useCityActivity(vault: Hex | undefined, emit: (e: LifeEvent) => 
               if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "approve", id: String(args.id), run: false });
               break;
             case "SessionKeySet":
-              emitRef.current({ type: "agenda", kind: "deputy", text: (args.sessionKey as string).toLowerCase() === zeroAddress ? "Mayor removes the deputy key" : "Mayor registers a deputy key for day-to-day work" });
+              emitRef.current({ type: "agenda", kind: "deputy", text: (args.sessionKey as string).toLowerCase() === zeroAddress ? tr("Mayor removes the deputy key", "Walikota menghapus kunci wakil") : tr("Mayor registers a deputy key for day-to-day work", "Walikota mendaftarkan kunci wakil untuk kerja harian") });
               break;
             case "FeeSet":
-              emitRef.current({ type: "agenda", kind: "fee", text: `Mayor changes the fee to ${(Number(args.newFeeBps) / 100).toFixed(1)}%` });
+              emitRef.current({ type: "agenda", kind: "fee", text: tr(`Mayor changes the fee to ${(Number(args.newFeeBps) / 100).toFixed(1)}%`, `Walikota mengubah fee menjadi ${(Number(args.newFeeBps) / 100).toFixed(1)}%`) });
               break;
             case "PlanKeyRevealed":
-              emitRef.current({ type: "agenda", kind: "reveal", text: "Mayor reveals a sealed plan from the strategy book" });
+              emitRef.current({ type: "agenda", kind: "reveal", text: tr("Mayor reveals a sealed plan from the strategy book", "Walikota membuka rencana tersegel dari buku strategi") });
               break;
             case "AgentGranted":
-              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "hire", text: `Mayor hires the ${ROLE_NAMES[Number(args.role)] ?? "AI staff"}` });
+              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "hire", text: tr(`Mayor hires the ${roleName(Number(args.role))}`, `Walikota menyewa ${roleName(Number(args.role))}`) });
               break;
             case "AgentRevoked":
-              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "fire", text: "Mayor releases an AI staff member" });
+              if ((args.city as string).toLowerCase() === vault.toLowerCase()) emitRef.current({ type: "agenda", kind: "fire", text: tr("Mayor releases an AI staff member", "Walikota melepas seorang staf AI") });
               break;
           }
         }

@@ -58,13 +58,13 @@ const EN = {
     yours: "Your funds in this city", all: "All", receive: "You receive", working: "Working…", btn: (all: boolean, pct: number) => `Withdraw ${all ? "everything" : `${pct}%`}`,
   },
   panel: {
-    notPlaced: "Not placed anywhere", empty: "empty", noReport: "No report yet.", notHired: "This city has no Humas yet. The mayor can hire one in the city hall.", writing: "The weekly report is still being written. Try again in a minute.",
+    notPlaced: "Not placed anywhere", empty: "empty", noReport: "No report yet.", notHired: "This city has no Public Relations staff yet. The mayor can hire one in the town hall.", writing: "The weekly report is still being written. Try again in a minute.",
     noCommunity: "No community", previewBadge: "Preview · sample data", live: "Live", youMayor: "You are the mayor", mayor: "Mayor", copyAria: "Copy mayor address", copied: "Copied", vault: "Vault", link: "Copy city link", linkCopied: "Link copied", svcFlow: "How it earns", svcRisk: "Risk", svcTvl: (v: string) => `The real protocol holds about ${v} on mainnet.`,
     where: "Where the money is", showAll: "Show all", simulated: "Simulated", idle: "Idle", liveProto: "Live protocol", funds: "Funds", share: "Share", apy: "APY",
     quarantined: "Quarantined", quarantineNote: "The city could not read this service's value, so it is set aside and not counted until it works again. Anyone can try to restore it.", restore: "Try to restore", restoring: "Restoring…", restored: "Restored: the service is counted again.",
     simNote: (p: string) => [`Testnet has no lending protocol that accepts AUSD, so nothing is lent here. This district earns the live APY of `, p, `, paid from a testnet reserve. The real protocol is used on mainnet.`] as [string, string, string],
     idleNote: "The plaza holds funds that the mayor has not placed anywhere. They earn nothing and can be withdrawn at any time.",
-    loadingReport: "Loading the weekly report…", hideReport: "Hide the weekly report", readReport: "Read the weekly report (Humas)",
+    loadingReport: "Loading the weekly report…", hideReport: "Hide the weekly report", readReport: "Read the weekly report (Public Relations)",
     keeps: (fee: string) => [`The mayor keeps `, fee, ` of profit only, and can never move funds to their own wallet.`] as [string, string, string], founded: (ago: string) => ` Founded ${ago}.`,
   },
   hud: {
@@ -74,6 +74,7 @@ const EN = {
   },
   attribution: "Map data © OpenStreetMap contributors · Overture Maps Foundation. Testnet only; no real money.",
   no3d: "This device cannot show the 3D city, so here is the map. Everything else works.",
+  building3d: "Building the city…", canvasAria: "3D city", sampleEvent: "Sample event",
   mapFallback: "The real map of this area could not be loaded, so you see open land for now. Trying again in the background.",
   intro: {
     kicker: "Welcome to Nusastakes", next: "Next", skip: "Skip", demo: "Watch the 80-second demo", explore: "Explore cities", look: "Look around",
@@ -81,7 +82,7 @@ const EN = {
       ["Every city is a savings pool", "Residents deposit AUSD into a city. Each city is an ERC-4626 vault on Monad, and the 3D city grows with its economy: the money in it, what it earns, its visitors, and how many kinds of services the mayor runs."],
       ["The mayor runs the city", "The mayor places the funds in districts that earn yield. The mayor earns a fee only from residents' profit, and the contract never lets them send funds to their own wallet."],
       ["One passkey, no seed phrase", "Your account comes from a passkey (Mera). The same passkey also locks the mayor's sealed strategy book: plans written before the results, revealed at the end of the season."],
-      ["AI staff with hard limits", "Mayors hire AI staff: Satpam (a Chainlink CRE workflow) can only pull funds back to safety, the Analyst only proposes, Humas writes the weekly report."],
+      ["AI staff with hard limits", "Mayors hire AI staff: the Security Guard (a Chainlink CRE workflow) can only pull funds back to safety, the Analyst only proposes, and Public Relations writes the weekly report."],
       ["Testnet, simulated yield", "This is Monad testnet. Yield follows a live mainnet AUSD vault and is labelled simulated. Test money is free."],
     ] as [string, string][],
   },
@@ -160,6 +161,7 @@ const ID: typeof EN = {
   },
   attribution: "Data peta © OpenStreetMap contributors · Overture Maps Foundation. Hanya testnet; bukan uang sungguhan.",
   no3d: "Perangkat ini tidak bisa menampilkan kota 3D, jadi inilah petanya. Fitur lainnya tetap berfungsi.",
+  building3d: "Membangun kota…", canvasAria: "Kota 3D", sampleEvent: "Acara contoh",
   mapFallback: "Peta asli area ini belum bisa dimuat, jadi untuk sementara tampil lahan kosong. Mencoba lagi di latar.",
   intro: {
     kicker: "Selamat datang di Nusastakes", next: "Lanjut", skip: "Lewati", demo: "Tonton demo 80 detik", explore: "Jelajahi kota", look: "Lihat-lihat",

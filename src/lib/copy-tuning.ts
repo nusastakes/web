@@ -15,6 +15,8 @@ export const TUNING = {
     loop: "Borrow and redeposit (loop)",
     loopHint: (borrow: string) => `Uses the deposit as collateral to borrow AUSD at ${borrow} and deposit it again. Higher yield while the borrow rate stays below the deposit rate.`,
     loopNo: (reason: string) => `Not allowed by the protocol: ${reason}`,
+    /** Alasan dari relayer (bahasa Inggris) menurut bahasa tampilan; alasan yang tidak dikenal ditampilkan apa adanya. */
+    reasons: {} as Record<string, string>,
     loopX: (x: string) => `${x}×`,
     range: "Price range (MON/USDC)",
     rangeHint: (price: string) => `A narrower range earns more fees while the price stays inside it, and nothing once it leaves. Centered on today's MON price ${price}.`,
@@ -49,6 +51,10 @@ export const TUNING = {
     loop: "Pinjam lalu taruh ulang (looping)",
     loopHint: (borrow: string) => `Setoran dipakai sebagai jaminan untuk meminjam AUSD dengan bunga ${borrow}, lalu ditaruh lagi. Hasil naik selama bunga pinjam di bawah bunga simpan.`,
     loopNo: (reason: string) => `Tidak diizinkan protokol: ${reason}`,
+    reasons: {
+      "the protocol does not accept this asset as collateral (LTV 0)": "protokol tidak menerima aset ini sebagai jaminan (LTV 0)",
+      "no borrow data for this market": "belum ada data pinjaman untuk pasar ini",
+    } as Record<string, string>,
     loopX: (x: string) => `${x}×`,
     range: "Rentang harga (MON/USDC)",
     rangeHint: (price: string) => `Rentang sempit mendapat fee lebih besar selama harga di dalamnya, dan nol begitu keluar. Berpusat pada harga MON hari ini ${price}.`,

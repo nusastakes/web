@@ -4,6 +4,7 @@ import { decodeAbiParameters, encodeAbiParameters, encodeFunctionData, parseAbiP
 import { tunedAdapterAbi } from "./abis";
 import type { Step } from "./actions";
 import { publicClient } from "./chain";
+import { loc } from "./l10n";
 import { monadTestnet, rpcTransport } from "./config";
 import type { Knobs } from "./catalog";
 import type { Tuning } from "./relayer";
@@ -113,7 +114,7 @@ export async function setTuningFlow(args: { wallet: WalletApi; adapter: Hex; own
   report("send", { state: "done", hash });
   report("confirm", { state: "active" });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  if (receipt.status !== "success") throw new Error(loc("The transaction was reverted."));
   report("confirm", { state: "done" });
   return { hash };
 }

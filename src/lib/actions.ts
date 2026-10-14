@@ -1,6 +1,8 @@
 import { ADDR, monadTestnet, rpcTransport } from "./config";
 import { adapterAbi, erc20Abi, marketplaceAbi, vaultAbi } from "./abis";
 import { publicClient } from "./chain";
+import { loc } from "./l10n";
+import { term, tr } from "./lang";
 import { relayDeposit, relayWithdraw, requestGas, splitSignature, type DepositResult, type HireVia, type WithdrawResult } from "./relayer";
 import type { Hex } from "./types";
 import type { WalletApi } from "./wallet";
@@ -123,7 +125,7 @@ export async function foundCityFlow(args: { wallet: WalletApi; owner: Hex; input
   const { wallet, owner, input, report } = args;
   const impls = input.adapterImpls?.length ? input.adapterImpls : [ADDR.mirrorAdapterImpl];
   const allowedList = await Promise.all(impls.map((impl) => publicClient.readContract({ address: ADDR.factory, abi: factoryAbi, functionName: "allowedAdapterImpl", args: [impl] }).catch(() => true)));
-  if (allowedList.some((ok) => !ok)) throw new Error("The city factory was updated and this page still has an old service address. Reload the page; if it keeps happening, tell the team.");
+  if (allowedList.some((ok) => !ok)) throw new Error(loc("The city factory was updated and this page still has an old service address. Reload the page; if it keeps happening, tell the team."));
   report("sign", { state: "active" });
   const mapURI = input.mapId.startsWith("osm:") ? input.mapId : `preset:${input.mapId}`;
   const callArgs = [input.name.trim(), input.community.trim(), input.feeBps, impls, mapURI] as const;
@@ -143,7 +145,7 @@ export async function foundCityFlow(args: { wallet: WalletApi; owner: Hex; input
   report("send", { state: "done", hash });
   report("confirm", { state: "active" });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  if (receipt.status !== "success") throw new Error(loc("The transaction was reverted."));
   const [created] = parseEventLogs({ abi: factoryAbi, eventName: "CityCreated", logs: receipt.logs });
   report("confirm", { state: "done" });
   return { hash, vault: created?.args.vault as Hex | undefined };
@@ -201,8 +203,8 @@ export async function readMayorState(vault: Hex, labels: Map<string, string>): P
     contracts: adapters.map((a) => ({ address: a, abi: adapterAbi, functionName: "totalAssets" }) as const),
   });
   const slots: Slot[] = [
-    { id: "idle", address: zeroAddress, label: "Plaza", assets: idle },
-    ...adapters.map((a, i) => ({ id: a, address: a as Hex, label: labels.get(a) ?? `District ${i + 1}`, assets: held[i] })),
+    { id: "idle", address: zeroAddress, label: term("plaza"), assets: idle },
+    ...adapters.map((a, i) => ({ id: a, address: a as Hex, label: labels.get(a) ?? tr(`District ${i + 1}`, `Distrik ${i + 1}`), assets: held[i] })),
   ];
   const total = slots.reduce((s, x) => s + x.assets, 0n);
   const active = key !== zeroAddress && Number(expiry) > nowSec();
@@ -250,7 +252,7 @@ export async function rebalanceFlow(args: { wallet: WalletApi; input: RebalanceI
   report("send", { state: "done", hash });
   report("confirm", { state: "active" });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  if (receipt.status !== "success") throw new Error(loc("The transaction was reverted."));
   report("confirm", { state: "done" });
   return { hash };
 }
@@ -285,7 +287,7 @@ export async function setDeputyFlow(args: { wallet: WalletApi; vault: Hex; deput
   report("send", { state: "done", hash });
   report("confirm", { state: "active" });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  if (receipt.status !== "success") throw new Error(loc("The transaction was reverted."));
   report("confirm", { state: "done" });
   return { hash };
 }
@@ -322,15 +324,15 @@ export async function contractTx(wallet: WalletApi, call: ContractCall | ((accou
       return createWalletClient({ account, chain: monadTestnet, transport: rpcTransport() }).sendTransaction((await build(account.address, c)) as never);
     });
   } else {
-    if (typeof call === "function") throw new Error("This action needs a fresh passkey confirmation.");
-    if (!wallet.address) throw new Error("Sign in first.");
+    if (typeof call === "function") throw new Error(loc("This action needs a fresh passkey confirmation."));
+    if (!wallet.address) throw new Error(loc("Sign in first."));
     hash = await wallet.sendTransaction(await build(wallet.address, call));
   }
   report?.("sign", { state: "done", detail: undefined });
   report?.("send", { state: "done", hash });
   report?.("confirm", { state: "active" });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error("The transaction was reverted.");
+  if (receipt.status !== "success") throw new Error(loc("The transaction was reverted."));
   report?.("confirm", { state: "done" });
   return { hash };
 }
@@ -346,7 +348,10 @@ export async function hireFlow(args: { wallet: WalletApi; owner: Hex; offer: Hir
   const price = BigInt(offer.price);
   if (price > 0n) {
     const balance = await publicClient.readContract({ address: offer.asset, abi: erc20Abi, functionName: "balanceOf", args: [owner] });
-    if (balance < price) throw new Error(`You need ${(Number(price) / 1e6).toFixed(2)} AUSD to hire ${name}, and you have ${(Number(balance) / 1e6).toFixed(2)}. Get test AUSD from the Deposit screen first.`);
+    if (balance < price) throw new Error(tr(
+      `You need ${(Number(price) / 1e6).toFixed(2)} AUSD to hire ${name}, and you have ${(Number(balance) / 1e6).toFixed(2)}. Get test AUSD from the Deposit screen first.`,
+      `Anda butuh ${(Number(price) / 1e6).toFixed(2)} AUSD untuk menyewa ${name}, dan Anda punya ${(Number(balance) / 1e6).toFixed(2)}. Ambil AUSD uji dari layar Setor dulu.`,
+    ));
   }
   const common = [BigInt(offer.listingId), BigInt(offer.periods), offer.expectedTerms, offer.hook, offer.data] as const;
   return contractTx(wallet, async (account) => {

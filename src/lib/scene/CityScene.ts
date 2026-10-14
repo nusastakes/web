@@ -23,6 +23,7 @@ import { toonRamp } from "./props";
 import { RoadGraph } from "./roadgraph";
 import { Scenery } from "./scenery";
 import { DEFAULT_STYLE, THEMES, developmentOf, type CityStyle } from "./themes";
+import { term, tr } from "../lang";
 
 const BG = 0xeef1fb;
 /** Jarak kamera dalam kelipatan radius kota; 3,5 membuat seluruh kota terlihat dengan sedikit ruang di tepi. */
@@ -128,7 +129,7 @@ export class CityScene {
   private hallId = -1;
   /** Kejadian kota terbaru (tindakan walikota, Satpam, Analis, penduduk) yang tampil di dalam gedung. */
   private agenda: AgendaItem[] = [];
-  private cityLabel = "Nusastakes city";
+  private cityLabel = tr("Nusastakes city", "Kota Nusastakes");
   private lastStats: CityStats | null = null;
   /** Pasca-proses (glow lampu malam, vignette, antialias) hanya di layar lebar; ponsel memakai render biasa. */
   private composer: EffectComposer | null = null;
@@ -342,7 +343,7 @@ export class CityScene {
     this.districtMeshes = [];
     const districts = this.districts.length
       ? this.districts
-      : ([{ id: "all", kind: "idle", label: "City", weight: 1, assets: 0, apyBps: null, simulated: false }] as District[]);
+      : ([{ id: "all", kind: "idle", label: tr("City", "Kota"), weight: 1, assets: 0, apyBps: null, simulated: false }] as District[]);
     const groups = assignDistricts(this.map.buildings, districts);
 
     for (const d of districts) {
@@ -608,7 +609,7 @@ export class CityScene {
       this.landmarks.update(this.timer.getElapsed(), (id) => {
         for (const dm of ds) { const b = dm.bldg.find((q) => q.id === id); if (b) return Math.max(0, Math.min(1, (dm.dev * (1 + RISE) - b.order) / RISE)); }
         return 0;
-      }, { name: this.cityLabel, tvl, apy, time: ck.label, phase: ck.phase, people: this.lastStats?.people ?? 0, trips: this.lastStats?.tripsToday ?? 0 }, night);
+      }, { name: this.cityLabel, tvl, apy, time: ck.label, phase: ck.phaseLabel, people: this.lastStats?.people ?? 0, trips: this.lastStats?.tripsToday ?? 0 }, night);
     }
     const open = ck.shopsOpen() ? 1 : 0;
     this.shopsOpen += (open - this.shopsOpen) * Math.min(1, dt * 2);
@@ -912,7 +913,7 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     const place = this.life?.placeOf(bi);
     const kind: BuildingKind = bi === this.hallId ? "hall" : (place?.kind ?? "home");
     this.interior = new BuildingInterior(this.cityGroup, {
-      id: bi, name: bi === this.hallId ? this.cityLabel : place?.name ?? "Building", kind, style: styleOf(raw, bi), h: raw.h, polygon: footprintOf(raw, bi),
+      id: bi, name: bi === this.hallId ? this.cityLabel : place?.name ?? tr("Building", "Gedung"), kind, style: styleOf(raw, bi), h: raw.h, polygon: footprintOf(raw, bi),
       district: { id: d?.id ?? "", label: d?.label ?? "", color: d ? DISTRICT_COLORS[d.kind] : "#9aa6cf", kind: d?.kind ?? "idle" },
     }, () => this.agenda, () => this.districts.map((q) => ({ label: q.label, share: q.weight, color: DISTRICT_COLORS[q.kind] })));
     this.interiorId = bi;
@@ -961,14 +962,15 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     let item: AgendaItem | null = null;
     const at = this.timer.getElapsed();
     switch (ev.type) {
-      case "transfer": item = { kind: "transfer", text: `Rebalance ${label(ev.from)} → ${label(ev.to)} · ${amt(ev.amount)} AUSD`, at, district: ev.to }; break;
-      case "propose": item = { kind: "propose", text: `Analyst proposes ${label(ev.from)} → ${label(ev.to)} · ${amt(ev.amount)} AUSD`, at, district: ev.to }; break;
-      case "approve": item = { kind: "approve", text: "Mayor approves the Analyst's proposal", at }; break;
-      case "alert": item = { kind: "alert", text: `Satpam evacuates ${label(ev.at)}`, at, district: ev.at }; break;
-      case "harvest": item = { kind: "harvest", text: `Mayor collects ${ev.amount.toFixed(1)} AUSD in fees`, at }; break;
-      case "festival": item = { kind: "festival", text: ev.label ?? `Mayor hosts an event at ${label(ev.at)}`, at, district: ev.at }; break;
-      case "deposit": item = { kind: "deposit", text: `A resident deposits ${amt(ev.amount)} AUSD`, at }; break;
-      case "withdraw": item = { kind: "withdraw", text: `A resident withdraws ${amt(ev.amount)} AUSD`, at }; break;
+      // Teks dibuat saat ditampilkan (getter), supaya agenda ikut bahasa yang sedang dipakai.
+      case "transfer": { const e = ev; item = { kind: "transfer", get text() { return `${tr("Rebalance", "Tata ulang")} ${label(e.from)} → ${label(e.to)} · ${amt(e.amount)} AUSD`; }, at, district: e.to }; break; }
+      case "propose": { const e = ev; item = { kind: "propose", get text() { return `${term("analyst")} ${tr("proposes", "mengusulkan")} ${label(e.from)} → ${label(e.to)} · ${amt(e.amount)} AUSD`; }, at, district: e.to }; break; }
+      case "approve": item = { kind: "approve", get text() { return tr(`Mayor approves the ${term("analyst", "en")}'s proposal`, `Walikota menyetujui usulan ${term("analyst", "id")}`); }, at }; break;
+      case "alert": { const e = ev; item = { kind: "alert", get text() { return `${term("guard")} ${tr("evacuates", "mengevakuasi")} ${label(e.at)}`; }, at, district: e.at }; break; }
+      case "harvest": { const e = ev; item = { kind: "harvest", get text() { return tr(`Mayor collects ${e.amount.toFixed(1)} AUSD in fees`, `Walikota mencairkan fee ${e.amount.toFixed(1)} AUSD`); }, at }; break; }
+      case "festival": { const e = ev; item = { kind: "festival", get text() { return e.label ?? tr(`Mayor hosts an event at ${label(e.at)}`, `Walikota mengadakan acara di ${label(e.at)}`); }, at, district: e.at }; break; }
+      case "deposit": { const e = ev; item = { kind: "deposit", get text() { return tr(`A resident deposits ${amt(e.amount)} AUSD`, `Seorang penduduk menyetor ${amt(e.amount)} AUSD`); }, at }; break; }
+      case "withdraw": { const e = ev; item = { kind: "withdraw", get text() { return tr(`A resident withdraws ${amt(e.amount)} AUSD`, `Seorang penduduk menarik ${amt(e.amount)} AUSD`); }, at }; break; }
       case "agenda": item = { kind: ev.kind, text: ev.text, at }; break;
     }
     if (item) { this.agenda.push(item); if (this.agenda.length > 20) this.agenda.shift(); }
@@ -1093,7 +1095,7 @@ vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     if (this.tickClock <= 0 && this.life) {
       this.tickClock = 0.5;
       this.lastStats = this.life.stats();
-      this.cb.onTick?.({ time: this.clock.label, phase: this.rain > 0.5 ? `${this.clock.phase} · rain` : this.clock.phase, hour: this.clock.hour, stats: this.lastStats });
+      this.cb.onTick?.({ time: this.clock.label, phase: this.rain > 0.5 ? `${this.clock.phaseLabel} · ${tr("rain", "hujan")}` : this.clock.phaseLabel, hour: this.clock.hour, stats: this.lastStats });
     }
     this.inspectClock -= dt;
     if (this.inspectClock <= 0 && this.life && this.cb.onInspect) {

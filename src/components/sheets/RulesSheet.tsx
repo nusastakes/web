@@ -9,7 +9,7 @@ import { RULES_COPY } from "@/lib/copy-rules";
 import { txUrl } from "@/lib/config";
 import { humanError } from "@/lib/errors";
 import { useLang } from "@/lib/lang";
-import { FALLBACK_PRESETS, RULES_DOMAIN, getPresets, getRules, putRules, type Metric, type Op, type Preset, type Rule, type RulesStatus } from "@/lib/rules";
+import { FALLBACK_PRESETS, RULES_DOMAIN, getPresets, getRules, localizePreset, putRules, ruleName, type Metric, type Op, type Preset, type Rule, type RulesStatus } from "@/lib/rules";
 import type { CityView, Hex } from "@/lib/types";
 import { useWallet } from "@/lib/wallet";
 import { Badge, Field, Notice, Sheet, Spinner, cx, inputCls } from "../ui";
@@ -159,7 +159,7 @@ export default function RulesSheet({ city, onClose }: Props) {
           <div className="rounded-xl bg-slate-900/[0.04] p-3">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-semibold text-ink">{t.autopilot}</span>
-              {ap?.autopilotIsSessionKey ? <Badge tone="good">ON</Badge> : <Badge>OFF</Badge>}
+              {ap?.autopilotIsSessionKey ? <Badge tone="good">{lang === "id" ? "AKTIF" : "ON"}</Badge> : <Badge>{lang === "id" ? "MATI" : "OFF"}</Badge>}
             </div>
             <p className="text-[11px] leading-relaxed text-ink-soft">{!ap?.autopilot ? t.apMissing : ap.autopilotIsSessionKey ? t.apOn(until) : t.apOff}</p>
             {isMayor && ap?.autopilot && (
@@ -175,7 +175,7 @@ export default function RulesSheet({ city, onClose }: Props) {
             {presets.map((p) => (
               <label key={p.id} className="flex items-start gap-2 rounded-lg px-1 py-1 text-[11px] leading-snug text-ink">
                 <input type="checkbox" className="mt-0.5" checked={presetOn(p)} disabled={!isMayor || busy !== null} onChange={() => togglePreset(p)} />
-                <span><b>{p.name}.</b> <span className="text-ink-soft">{p.rules.map(describe).join(" · ")}</span></span>
+                <span><b>{localizePreset(p, lang).name}.</b> <span className="text-ink-soft">{p.rules.map(describe).join(" · ")}</span></span>
               </label>
             ))}
           </div>
@@ -186,7 +186,7 @@ export default function RulesSheet({ city, onClose }: Props) {
             {custom.map((r) => (
               <div key={r.id} className="flex items-start gap-2 text-[11px] leading-snug">
                 <input type="checkbox" className="mt-0.5" checked={r.enabled} disabled={!isMayor} onChange={() => setRules((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x)))} />
-                <span className="flex-1"><b>{r.name}.</b> <span className="text-ink-soft">{describe(r)}</span></span>
+                <span className="flex-1"><b>{ruleName(r.name, lang)}.</b> <span className="text-ink-soft">{describe(r)}</span></span>
                 {isMayor && <button className="text-[11px] font-semibold text-bad hover:underline" onClick={() => setRules((rs) => rs.filter((x) => x.id !== r.id))}>{t.remove}</button>}
               </div>
             ))}
@@ -267,7 +267,7 @@ export default function RulesSheet({ city, onClose }: Props) {
             {!ap?.recent?.length ? <p className="text-[11px] text-ink-soft">{t.noLog}</p> : ap.recent.slice(0, 8).map((a, i) => (
               <div key={i} className="flex items-center justify-between gap-2 text-[11px] text-ink-soft">
                 <span className="truncate">
-                  {new Date(a.at * 1000).toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit" })} · {rules.find((r) => r.id === a.ruleId)?.name ?? a.ruleId}: {a.kind === "move" ? `${t.move} ${a.amount ? (Number(a.amount) / 1e6).toFixed(2) : "?"} AUSD ${t.from} ${nameOf(a.fromService ?? a.from)} ${t.to} ${nameOf(a.toService ?? a.to)}` : `${t.tune} ${nameOf(a.service)}`}
+                  {new Date(a.at * 1000).toLocaleTimeString(lang === "id" ? "id-ID" : "en-US", { hour: "2-digit", minute: "2-digit" })} · {ruleName(rules.find((r) => r.id === a.ruleId)?.name ?? a.ruleId, lang)}: {a.kind === "move" ? `${t.move} ${a.amount ? (Number(a.amount) / 1e6).toFixed(2) : "?"} AUSD ${t.from} ${nameOf(a.fromService ?? a.from)} ${t.to} ${nameOf(a.toService ?? a.to)}` : `${t.tune} ${nameOf(a.service)}`}
                 </span>
                 {a.hash && <a className="shrink-0 text-accent hover:underline" href={txUrl(a.hash)} target="_blank" rel="noreferrer">tx</a>}
               </div>

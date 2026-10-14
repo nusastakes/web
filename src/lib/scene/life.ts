@@ -4,6 +4,7 @@ import type { CityClock } from "./clock";
 import { findPlaces, type Place } from "./places";
 import { RoadGraph, type Edge, type Profile } from "./roadgraph";
 import { Layered, box, merge, part, toonRamp, wheel, type Model } from "./props";
+import { currentLang, term, tr } from "../lang";
 
 /**
  * Kehidupan kota: kendaraan, pejalan kaki, truk logistik, kerumunan acara, pin, dan partikel.
@@ -240,6 +241,41 @@ const KIND_LEN: Record<Kind, number> = { car: 4.2, bike: 1.8, box: 8, flat: 8, s
 const KIND_SCALE: Record<Kind, number> = { car: 2.2, bike: 2.2, box: 2.2, flat: 2.2, satpam: 2.2, ped: 2.1, bus: 1.6, angkot: 2.0, ojek: 2.2, ojekP: 2.2, cart: 2.1, mixer: 2.2 };
 const isVehicle = (k: Kind) => k !== "ped" && k !== "cart";
 const VENDOR_ITEMS = ["Bakso", "Siomay", "Es cendol", "Sate ayam", "Martabak", "Kopi keliling", "Roti bakar", "Cilok", "Es dawet", "Nasi goreng"];
+/** Nama dagangan dalam bahasa Inggris (kunci = nama Indonesia di `VENDOR_ITEMS`). */
+const VENDOR_EN: Record<string, string> = {
+  "Bakso": "Meatball soup", "Siomay": "Fish dumplings", "Es cendol": "Cendol iced drink", "Sate ayam": "Chicken satay", "Martabak": "Stuffed pancake",
+  "Kopi keliling": "Coffee", "Roti bakar": "Toast", "Cilok": "Tapioca balls", "Es dawet": "Dawet iced drink", "Nasi goreng": "Fried rice",
+};
+const vendorItem = (item: string) => (currentLang() === "id" ? item : VENDOR_EN[item] ?? item);
+
+/**
+ * Peran agen disimpan sebagai kunci bahasa Inggris karena dipakai menghitung jumlah agen (`n(prefix)`); terjemahannya
+ * baru dipilih saat kartu info ditampilkan. Peran majemuk ("Street vendor · Bakso") diterjemahkan per bagian.
+ */
+const ROLE_ID: Record<string, string> = {
+  "City bus": "Bus kota", "Bus passenger": "Penumpang bus", "Angkot passenger": "Penumpang angkot", "Parked motorbike": "Motor parkir", "Parked car": "Mobil parkir",
+  "Jogger": "Pelari", "Park visitor": "Pengunjung taman", "Ojek online": "Ojek online", "passenger ride": "antar penumpang", "food delivery": "antar makanan",
+  "Commuter": "Pekerja pulang-pergi", "Delivery van": "Mobil boks", "restocking": "isi stok toko", "Garbage truck": "Truk sampah", "dawn round": "putaran subuh",
+  "Concrete mixer": "Truk molen", "Street vendor": "Pedagang keliling", "Customer": "Pembeli", "Night market visitor": "Pengunjung pasar malam",
+  "Pedestrian": "Pejalan kaki", "crossing the street": "menyeberang jalan", "Waiting for the bus": "Menunggu bus", "Office worker": "Pekerja kantor",
+  "Student": "Pelajar", "Lunch break": "Istirahat makan siang", "Shopper": "Pembeli", "Snack run": "Cari camilan", "Going home": "Pulang", "Dinner out": "Makan malam di luar",
+  "Resident": "Penduduk", "Fund convoy": "Konvoi dana", "Driver": "Pengemudi", "Car": "Mobil", "Motorbike": "Motor", "Box truck": "Truk boks",
+};
+const ROLE_EN: Record<string, string> = { "Ojek online": "Motorbike taxi", "Angkot passenger": "Minibus passenger" };
+function roleText(role: string): string {
+  if (role === "Satpam guard") return term("guard");
+  const id = currentLang() === "id";
+  return role.split(" · ").map((part) => {
+    if (part.startsWith("line ")) return id ? `jalur ${part.slice(5)}` : part;
+    if (part.startsWith("Angkot ")) return id ? part : `Minibus ${part.slice(7)}`;
+    if (VENDOR_ITEMS.includes(part)) return vendorItem(part);
+    return id ? ROLE_ID[part] ?? part : ROLE_EN[part] ?? part;
+  }).join(" · ");
+}
+/** Nama jenis distrik untuk label usulan. */
+const kindName = (kind: string) => ({
+  idle: term("plaza"), lending: tr("Lending", "Pinjaman"), vault: tr("Vault", "Brankas"), staking: tr("Staking", "Staking"), arena: tr("Arena", "Arena"), market: tr("Market", "Pasar"),
+} as Record<string, string>)[kind] ?? kind;
 
 interface Agent {
   kind: Kind;
@@ -557,7 +593,7 @@ export class CityLife {
       case "transfer": this.transfer(ev.from, ev.to, ev.amount, ev.tone ?? "blue", ev.label); break;
       case "deposit": this.flow(true, ev.amount); break;
       case "withdraw": this.flow(false, ev.amount); break;
-      case "festival": this.festival(ev.at, ev.label ?? "Mayor's event", ev.size ?? 46, ev.seconds ?? 36); break;
+      case "festival": this.festival(ev.at, ev.label ?? tr("Mayor's event", "Acara walikota"), ev.size ?? 46, ev.seconds ?? 36); break;
       case "harvest": this.harvest(ev.amount); break;
       case "alert": this.alert(ev.at, ev.amount ?? 800, ev.label); break;
       case "propose": this.propose(ev.id, ev.from, ev.to, ev.amount); break;
@@ -734,7 +770,7 @@ export class CityLife {
   private alert(at: string, amount: number, label?: string) {
     const dep = this.depotOf(at), plaza = this.depotOf("idle");
     if (!dep || !plaza) return;
-    const ev = this.makeEvent("alert", dep, TONE_HEX.red, 22, label ?? "Satpam: evacuating", "red");
+    const ev = this.makeEvent("alert", dep, TONE_HEX.red, 22, label ?? `${term("guard")}: ${tr("evacuating", "mengevakuasi")}`, "red");
     // Warga yang sedang berkumpul di distrik ini bubar.
     for (const other of this.events.values()) if (other.type === "festival" && other.depot === dep.id) this.disperse(other.id, plaza);
     // Dua mobil Satpam dari alun-alun.
@@ -759,14 +795,14 @@ export class CityLife {
       }
     }
     // Truk membawa dana ke alun-alun.
-    this.after(2.5, () => this.transfer(at, "idle", amount, "red", `${this.fmt(amount)} AUSD to safety`));
+    this.after(2.5, () => this.transfer(at, "idle", amount, "red", `${this.fmt(amount)} AUSD ${tr("to safety", "diamankan")}`));
     return ev;
   }
 
   private propose(id: string, from: string, to: string, amount: number) {
     const dep = this.depotOf(to);
     if (!dep) return;
-    const ev = this.makeEvent("propose", dep, TONE_HEX.violet, 600, `Analyst proposes: ${this.depotOf(from)?.kind ?? from} → ${dep.kind} · ${this.fmt(amount)}`, "violet");
+    const ev = this.makeEvent("propose", dep, TONE_HEX.violet, 600, `${term("analyst")} ${tr("proposes", "mengusulkan")}: ${kindName(this.depotOf(from)?.kind ?? from)} → ${kindName(dep.kind)} · ${this.fmt(amount)}`, "violet");
     ev.proposal = { from, to, amount };
     this.events.delete(ev.id);
     this.events.set(`proposal:${id}`, ev);
@@ -777,7 +813,7 @@ export class CityLife {
     if (!ev || !ev.proposal) return;
     ev.until = this.t;
     const p = ev.proposal;
-    if (run) this.after(0.4, () => this.transfer(p.from, p.to, p.amount, "violet", `${this.fmt(p.amount)} AUSD · approved`));
+    if (run) this.after(0.4, () => this.transfer(p.from, p.to, p.amount, "violet", `${this.fmt(p.amount)} AUSD · ${tr("approved", "disetujui")}`));
   }
 
   private fireworks() {
@@ -808,7 +844,7 @@ export class CityLife {
     if (!dep) return;
     this.burst(dep.x, 6, dep.z, 70, [0xf5b301, 0xffd45e, 0xffffff], 3.2, 26);
     this.ring(dep.x, dep.z, 0xf5b301, 4, 36, 2.2);
-    this.makeEvent("note", dep, 0xf5b301, 5.5, `Fee collected · +${amount.toFixed(1)} AUSD`, "gold");
+    this.makeEvent("note", dep, 0xf5b301, 5.5, `${tr("Fee collected", "Fee dicairkan")} · +${amount.toFixed(1)} AUSD`, "gold");
   }
 
 
@@ -934,7 +970,7 @@ export class CityLife {
       path.push(...r);
     }
     if (path.length < 8) return;
-    const NAMES = ["Taman Kota", "Pasar Baru", "Balai Kota", "Menara", "Kampus", "Stasiun", "Masjid Raya", "Plaza", "Pecinan", "Kali Bersih", "Rumah Sakit", "Terminal"];
+    const NAMES: [string, string][] = [["City Park", "Taman Kota"], ["New Market", "Pasar Baru"], ["Town Hall", "Balai Kota"], ["Tower", "Menara"], ["Campus", "Kampus"], ["Station", "Stasiun"], ["Grand Mosque", "Masjid Raya"], ["Plaza", "Plaza"], ["Chinatown", "Pecinan"], ["Clean River", "Kali Bersih"], ["Hospital", "Rumah Sakit"], ["Terminal", "Terminal"]];
     const stops = new Map<number, number>();
     const shelters: { x: number; z: number; waiting: Agent[]; name: string }[] = [];
     const parts: THREE.BufferGeometry[] = [];
@@ -961,7 +997,9 @@ export class CityLife {
         part(rot(box(0.12, 0.9, 0.9).translate(2.9, 3.3, -0.7)), 0x2f6fe0, x, 0, z),
       );
       stops.set(i, shelters.length);
-      shelters.push({ x: x - lx * 1.0, z: z - lz * 1.0, waiting: [], name: `Halte ${NAMES[shelters.length % NAMES.length]}` });
+      // Nama halte dipilih saat ditampilkan, supaya ikut bahasa yang sedang dipakai.
+      const [en, id] = NAMES[shelters.length % NAMES.length];
+      shelters.push({ x: x - lx * 1.0, z: z - lz * 1.0, waiting: [], get name() { return tr(`${en} stop`, `Halte ${id}`); } });
       next = acc + 230;
     }
     if (!shelters.length) return;
@@ -1000,32 +1038,32 @@ export class CityLife {
     a.info = () => {
       let name = "";
       for (let i = a.seg + 1; i < line.path.length && !name; i++) { const si = line.stops.get(i); if (si !== undefined) name = line.shelters[si].name; }
-      return `${a.riders ?? 0} passengers on board · next stop ${name || line.shelters[0].name}`;
+      return tr(`${a.riders ?? 0} passengers on board · next stop ${name || line.shelters[0].name}`, `${a.riders ?? 0} penumpang · halte berikutnya ${name || line.shelters[0].name}`);
     };
   }
 
   // --- Orang dan perjalanan ----------------------------------------------------------------------------------
 
-  private pedTrip(from: number, to: number, role: string, detail: string, onArrive?: () => void): Agent | null {
+  private pedTrip(from: number, to: number, role: string, detail: () => string, onArrive?: () => void): Agent | null {
     const r = this.g.route(from, to, "ped");
     if (!r || r.length < 2) return null;
     const a = this.spawn("ped", r, { speed: 1.25 + this.rnd() * 0.7 });
     if (!a) return null;
     a.role = role;
-    a.info = () => detail;
+    a.info = detail;
     a.ttl = this.t + 150;
     a.onEnd = (ag) => { ag.kill = true; this.today.trips++; onArrive?.(); };
     return a;
   }
 
   /** Perjalanan dari pintu gedung ke pintu gedung: keluar pintu, menyusuri trotoar, lalu masuk pintu tujuan. */
-  private journey(from: Place, to: Place, role: string, detail: string): Agent | null {
+  private journey(from: Place, to: Place, role: string, detail: () => string): Agent | null {
     const r = this.g.route(from.ped, to.ped, "ped");
     if (!r || r.length < 2) return null;
     const a = this.spawn("ped", [from.ped], { speed: 1.25 + this.rnd() * 0.7 });
     if (!a) return null;
     a.role = role;
-    a.info = () => detail;
+    a.info = detail;
     a.ttl = this.t + 170;
     a.x = from.door.x; a.z = from.door.z;
     a.free = { tx: this.g.x[from.ped], tz: this.g.z[from.ped] };
@@ -1062,7 +1100,7 @@ export class CityLife {
         a.x = x; a.z = z; a.yaw = yaw;
         a.wait = 1e9;
         a.role = "Parked motorbike";
-        a.info = () => `Parked in front of ${pl.name}`;
+        a.info = () => tr(`Parked in front of ${pl.name}`, `Parkir di depan ${pl.name}`);
         total++;
       }
     }
@@ -1073,10 +1111,10 @@ export class CityLife {
     if (this.pools.ped.available < 120) return;
     const from = this.nearestPed(x, z);
     const dest = this.pickNear(this.hour() < 12 ? "office" : "home", x, z, 220);
-    if (dest) this.pedTrip(from, dest.ped, role, `Walking from the bus stop to ${dest.name}`);
+    if (dest) this.pedTrip(from, dest.ped, role, () => tr(`Walking from the bus stop to ${dest.name}`, `Berjalan dari halte ke ${dest.name}`));
   }
 
-  private standAt(x: number, z: number, yaw: number, role: string, detail: string, seconds: number): Agent | null {
+  private standAt(x: number, z: number, yaw: number, role: string, detail: () => string, seconds: number): Agent | null {
     const n = this.nearestPed(x, z);
     const a = this.spawn("ped", [n], { speed: 0 });
     if (!a) return null;
@@ -1084,7 +1122,7 @@ export class CityLife {
     a.x = x; a.z = z; a.yaw = yaw;
     a.wait = seconds;
     a.role = role;
-    a.info = () => detail;
+    a.info = detail;
     a.onEnd = (ag) => { ag.kill = true; };
     return a;
   }
@@ -1102,7 +1140,7 @@ export class CityLife {
     go();
     a.ttl = this.t + 140;
     a.role = kind === "jogger" ? "Jogger" : "Park visitor";
-    a.info = () => (kind === "jogger" ? "Morning or evening run in the park" : "Taking a walk in the park");
+    a.info = () => (kind === "jogger" ? tr("Morning or evening run in the park", "Lari pagi atau sore di taman") : tr("Taking a walk in the park", "Jalan-jalan di taman"));
     a.onEnd = (ag) => { if (--legs <= 0) { ag.kill = true; return; } if (kind === "stroller" && this.rnd() < 0.4) ag.wait = 3 + this.rnd() * 6; go(); };
   }
 
@@ -1128,7 +1166,7 @@ export class CityLife {
     const [from, to] = toWork ? [home, work] : [work, home];
     const role = kind === "ojekP" ? "Ojek online · passenger ride" : "Commuter";
     this.vehTrip(kind, from.veh, to.veh, kind === "car" ? 9 + this.rnd() * 4 : 10 + this.rnd() * 4, role,
-      () => `${toWork ? "Heading to work" : "Going home"}: ${from.name} → ${to.name}`);
+      () => `${toWork ? tr("Heading to work", "Berangkat kerja") : tr("Going home", "Pulang")}: ${from.name} → ${to.name}`);
   }
 
   private spawnFoodDelivery() {
@@ -1136,7 +1174,7 @@ export class CityLife {
     if (!food || !home) return;
     let orders = 1 + Math.floor(this.rnd() * 2);
     let cur = { food, home };
-    const a = this.vehTrip("ojek", food.veh, home.veh, 10 + this.rnd() * 4, "Ojek online · food delivery", () => `Delivering an order from ${cur.food.name} to ${cur.home.name}`, (ag) => {
+    const a = this.vehTrip("ojek", food.veh, home.veh, 10 + this.rnd() * 4, "Ojek online · food delivery", () => tr(`Delivering an order from ${cur.food.name} to ${cur.home.name}`, `Mengantar pesanan dari ${cur.food.name} ke ${cur.home.name}`), (ag) => {
       ag.wait = 2.2;
       this.today.deliveries++;
       this.today.sales++;
@@ -1156,11 +1194,11 @@ export class CityLife {
     const shop = this.pickPlace(this.rnd() < 0.5 ? "shop" : "food");
     if (!shop) return;
     const edge = this.pickEdge();
-    this.vehTrip("box", edge, shop.veh, 8 + this.rnd() * 2, "Delivery van · restocking", () => `Bringing stock to ${shop.name}`, (ag) => {
+    this.vehTrip("box", edge, shop.veh, 8 + this.rnd() * 2, "Delivery van · restocking", () => tr(`Bringing stock to ${shop.name}`, `Mengantar stok ke ${shop.name}`), (ag) => {
       ag.wait = 4;
       this.burst(ag.x, 2.5, ag.z, 5, [0xc99a5b, 0xffffff], 0.5, 6);
       const back = this.g.route(shop.veh, this.pickEdge(), "veh");
-      ag.info = () => `Restocked ${shop.name}, heading back to the warehouse`;
+      ag.info = () => tr(`Restocked ${shop.name}, heading back to the warehouse`, `Stok ${shop.name} sudah diisi, kembali ke gudang`);
       if (back && back.length > 1) { ag.path = back; ag.seg = 0; ag.s = 0; ag.onEnd = (q) => { q.kill = true; this.today.trips++; }; } else ag.onEnd = (q) => { q.kill = true; };
     });
   }
@@ -1175,16 +1213,16 @@ export class CityLife {
     };
     const home = this.pickPlace("home");
     if (!home) return;
-    const a = this.vehTrip("box", this.pickEdge(), home.veh, 6.5, "Garbage truck · dawn round", () => `Collecting rubbish, ${stops} stops left`, (ag) => { ag.wait = 2.5; ag.onEnd = (q) => next(q); });
+    const a = this.vehTrip("box", this.pickEdge(), home.veh, 6.5, "Garbage truck · dawn round", () => tr(`Collecting rubbish, ${stops} stops left`, `Mengangkut sampah, ${stops} titik lagi`), (ag) => { ag.wait = 2.5; ag.onEnd = (q) => next(q); });
     if (a) this.pools.box.color(a.slot, new THREE.Color("#2f8a4f"));
   }
 
   private spawnMixer() {
     const site = this.sites[Math.floor(this.rnd() * this.sites.length)];
     if (!site) return;
-    this.vehTrip("mixer", this.pickEdge(), site.node, 7.5, "Concrete mixer", () => "Bringing concrete to the construction site", (ag) => {
+    this.vehTrip("mixer", this.pickEdge(), site.node, 7.5, "Concrete mixer", () => tr("Bringing concrete to the construction site", "Mengantar beton ke proyek"), (ag) => {
       ag.wait = 7;
-      ag.info = () => "Pouring concrete at the site";
+      ag.info = () => tr("Pouring concrete at the site", "Menuang beton di proyek");
       const back = this.g.route(site.node, this.pickEdge(), "veh");
       if (back && back.length > 1) { ag.path = back; ag.seg = 0; ag.s = 0; ag.onEnd = (q) => { q.kill = true; }; } else ag.onEnd = (q) => { q.kill = true; };
     });
@@ -1200,7 +1238,7 @@ export class CityLife {
     a.riders = Math.floor(this.rnd() * 8);
     const code = `M${String(1 + Math.floor(this.rnd() * 40)).padStart(2, "0")}`;
     a.role = `Angkot ${code}`;
-    a.info = () => `Shared minibus · ${a.riders ?? 0} passengers · stops anywhere a passenger waves`;
+    a.info = () => tr(`Shared minibus · ${a.riders ?? 0} passengers · stops anywhere a passenger waves`, `Angkot · ${a.riders ?? 0} penumpang · berhenti di mana saja penumpang melambai`);
     a.onNode = (ag, node) => {
       if (this.signals.has(node) || this.rnd() > 0.22) return;
       ag.wait = 1.6;
@@ -1222,7 +1260,7 @@ export class CityLife {
     const item = VENDOR_ITEMS[Math.floor(this.rnd() * VENDOR_ITEMS.length)];
     let sold = 0;
     a.role = `Street vendor · ${item}`;
-    a.info = () => `Pushing a ${item.toLowerCase()} cart through the neighbourhood · ${sold} sold today`;
+    a.info = () => tr(`Pushing a ${vendorItem(item).toLowerCase()} cart through the neighbourhood · ${sold} sold today`, `Mendorong gerobak ${item.toLowerCase()} keliling kampung · ${sold} terjual hari ini`);
     a.onNode = (ag) => {
       if (this.clock && !this.clock.vendors(this.hour())) { ag.kill = true; return; }
       if (this.rnd() > 0.2) return;
@@ -1231,7 +1269,7 @@ export class CityLife {
       const n = 1 + Math.floor(this.rnd() * 2);
       for (let k = 0; k < n; k++) {
         const ang = ag.yaw + (k ? 0.9 : -0.9);
-        this.standAt(ag.x + Math.cos(ang) * 3.2, ag.z - Math.sin(ang) * 3.2, ag.yaw + Math.PI, "Customer", `Buying ${item.toLowerCase()}`, secs);
+        this.standAt(ag.x + Math.cos(ang) * 3.2, ag.z - Math.sin(ang) * 3.2, ag.yaw + Math.PI, "Customer", () => tr(`Buying ${vendorItem(item).toLowerCase()}`, `Membeli ${item.toLowerCase()}`), secs);
       }
       sold += n;
       this.today.sales += n;
@@ -1295,7 +1333,7 @@ export class CityLife {
     go();
     a.ttl = this.t + 110;
     a.role = "Night market visitor";
-    a.info = () => `Browsing the night market stalls · ${stops} more to visit`;
+    a.info = () => tr(`Browsing the night market stalls · ${stops} more to visit`, `Melihat-lihat lapak pasar malam · ${stops} lagi`);
     a.onEnd = (ag) => { if (--stops <= 0 || m.open < 0.3) { ag.kill = true; return; } ag.wait = 2 + this.rnd() * 4; this.today.sales++; go(); };
   }
 
@@ -1312,7 +1350,7 @@ export class CityLife {
     a.free = { tx: a.x, tz: a.z };
     a.yaw = Math.atan2(-(ez - sz), ex - sx);
     a.role = "Pedestrian · crossing the street";
-    a.info = () => (this.signalState(c.sig, c.from, c.to) === "r" ? "Crossing at the zebra crossing" : "Waiting for the cars to stop");
+    a.info = () => (this.signalState(c.sig, c.from, c.to) === "r" ? tr("Crossing at the zebra crossing", "Menyeberang di zebra cross") : tr("Waiting for the cars to stop", "Menunggu kendaraan berhenti"));
     a.ttl = this.t + 80;
     a.onEnd = (ag) => {
       ag.gate = () => this.signalState(c.sig, c.from, c.to) === "r" && this.signalState(c.sig, c.to, c.from) !== "g";
@@ -1389,7 +1427,7 @@ export class CityLife {
         : h < 22 ? (r < 0.6 ? ["office", "home", "Going home"] : ["home", "food", "Dinner out"]) : ["food", "home", "Going home"];
       const from = this.pickPlace(fromK as keyof CityLife["byKind"]);
       const to = from && this.pickNear(toK as keyof CityLife["byKind"], from.x, from.z, 260);
-      if (from && to && from !== to) this.journey(from, to, `Pedestrian · ${label}`, `${label}: ${from.name} → ${to.name}`);
+      if (from && to && from !== to) this.journey(from, to, `Pedestrian · ${label}`, () => `${roleText(label)}: ${from.name} → ${to.name}`);
     }
     if (this.parks.length) {
       const park = C ? C.parkLife(h) : 0.3;
@@ -1401,7 +1439,7 @@ export class CityLife {
       for (const sh of this.bus.shelters) {
         sh.waiting = sh.waiting.filter((q) => !q.kill);
         if (sh.waiting.length < 4 && this.rnd() < 0.06 + 0.3 * commute) {
-          const w = this.standAt(sh.x + (this.rnd() - 0.5) * 4, sh.z + (this.rnd() - 0.5) * 1.2, this.rnd() * 6.28, "Waiting for the bus", `Waiting at ${sh.name}`, 9999);
+          const w = this.standAt(sh.x + (this.rnd() - 0.5) * 4, sh.z + (this.rnd() - 0.5) * 1.2, this.rnd() * 6.28, "Waiting for the bus", () => tr(`Waiting at ${sh.name}`, `Menunggu di ${sh.name}`), 9999);
           if (w) sh.waiting.push(w);
         }
       }
@@ -1471,9 +1509,9 @@ export class CityLife {
   clearSelection() { this.selected = null; }
 
   private describe(a: Agent): Inspect {
-    const detail = a.info?.() ?? (a.parked ? "Parked by the kerb" : a.kind === "ped" ? "Out for a walk" : a.kind === "flat" ? "Carrying city funds between districts" : "Driving around town");
+    const detail = a.info?.() ?? (a.parked ? tr("Parked by the kerb", "Parkir di tepi jalan") : a.kind === "ped" ? tr("Out for a walk", "Sedang berjalan-jalan") : a.kind === "flat" ? tr("Carrying city funds between districts", "Membawa dana kota antar distrik") : tr("Driving around town", "Berkeliling kota"));
     const tone: Tone = a.kind === "flat" ? "blue" : a.kind === "satpam" ? "red" : a.role.startsWith("Ojek") ? "green" : a.kind === "bus" || a.kind === "angkot" ? "violet" : a.kind === "cart" ? "amber" : "blue";
-    return { title: a.parked ? (a.kind === "bike" ? "Parked motorbike" : "Parked car") : a.role, detail, tone };
+    return { title: roleText(a.parked ? (a.kind === "bike" ? "Parked motorbike" : "Parked car") : a.role), detail, tone };
   }
 
   stats(): CityStats {
@@ -1830,7 +1868,7 @@ export class CityLife {
     const a = this.spawn(kind, [start, next], { speed, ambient: true });
     if (!a) return;
     a.role = kind === "car" ? "Car" : kind === "bike" ? "Motorbike" : kind === "box" ? "Box truck" : "Resident";
-    a.info = () => (kind === "ped" ? "Strolling around the neighbourhood" : kind === "box" ? "Making deliveries across town" : "Running errands around town");
+    a.info = () => (kind === "ped" ? tr("Strolling around the neighbourhood", "Jalan-jalan di sekitar kampung") : kind === "box" ? tr("Making deliveries across town", "Mengantar barang keliling kota") : tr("Running errands around town", "Mengurus keperluan di kota"));
   }
 
   /** Mobil yang diparkir di tepi jalan lebar, diam di tempat. */

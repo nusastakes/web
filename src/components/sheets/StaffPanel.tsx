@@ -9,8 +9,8 @@ import { MAYOR } from "@/lib/copy-mayor";
 import { humanError } from "@/lib/errors";
 import { fmtAusd } from "@/lib/format";
 import { emitChange } from "@/lib/hooks";
-import { useLang } from "@/lib/lang";
-import { getMarketplace, getProposals, getReport, runAnalyst, type MarketAgent, type ProposalInfo } from "@/lib/relayer";
+import { term, useLang, type Term } from "@/lib/lang";
+import { getMarketplace, getProposals, getReport, proposalReason, runAnalyst, type MarketAgent, type ProposalInfo } from "@/lib/relayer";
 import type { CityView, Hex } from "@/lib/types";
 import { useWallet } from "@/lib/wallet";
 import StepList from "../StepList";
@@ -25,6 +25,8 @@ import { Badge, Notice, Spinner } from "../ui";
  */
 
 const HIRE_DAYS = 7;
+/** Nama staf tim mengikuti bahasa tampilan; nama dari relayer ("Satpam", "Analis", "Humas") hanya dipakai untuk agen lain. */
+const TEAM_TERM: Record<string, Term> = { satpam: "guard", analis: "analyst", humas: "pr" };
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 export default function StaffPanel({ city, onDone }: { city: CityView; onDone: () => void }) {
@@ -32,6 +34,7 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
   const [lang] = useLang();
   const t = MAYOR[lang].staff;
   const vault = city.vault as Hex;
+  const nameOf = (a: MarketAgent) => (a.source === "team" && TEAM_TERM[a.id] ? term(TEAM_TERM[a.id], lang) : a.name);
   const [agents, setAgents] = useState<MarketAgent[] | null>(null);
   const [hired, setHired] = useState<Record<string, number>>({});
   const [proposals, setProposals] = useState<ProposalInfo[]>([]);
@@ -73,18 +76,18 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
     catch (e) { setError(humanError(e)); setBusy((b) => (b ? { ...b, steps: b.steps.map((x) => (x.state === "active" ? { ...x, state: "error" } : x)) } : b)); }
   };
 
-  const hire = (a: MarketAgent) => run(a.id, `${a.name} hired`, (report) => {
+  const hire = (a: MarketAgent) => run(a.id, `${nameOf(a)} hired`, (report) => {
     if (a.hireVia) {
-      if (!w.address) throw new Error("Sign in first.");
-      return hireFlow({ wallet: w, owner: w.address, offer: a.hireVia, name: a.name, report });
+      if (!w.address) throw new Error(t.signInFirst);
+      return hireFlow({ wallet: w, owner: w.address, offer: a.hireVia, name: nameOf(a), report });
     }
     return contractTx(w, {
       address: ADDR.guardian, abi: guardianAbi, functionName: "grantAgent", args: [vault, a.wallet, a.roleId, BigInt(Math.floor(Date.now() / 1000) + HIRE_DAYS * 86400)],
-    }, { ceremony: true, label: `Confirm hiring ${a.name}…`, report });
+    }, { ceremony: true, label: `Confirm hiring ${nameOf(a)}…`, report });
   });
-  const fire = (a: MarketAgent) => run(a.id, `${a.name} released`, (report) => contractTx(w, {
+  const fire = (a: MarketAgent) => run(a.id, `${nameOf(a)} released`, (report) => contractTx(w, {
     address: ADDR.guardian, abi: guardianAbi, functionName: "revokeAgent", args: [vault, a.wallet],
-  }, { ceremony: true, label: `Confirm releasing ${a.name}…`, report }));
+  }, { ceremony: true, label: `Confirm releasing ${nameOf(a)}…`, report }));
   const approve = (p: ProposalInfo) => run(`p${p.proposalId}`, "Proposal carried out", (report) => contractTx(w, {
     address: ADDR.guardian, abi: guardianAbi, functionName: "approve", args: [vault, BigInt(p.proposalId)],
   }, { ceremony: false, label: "Approve", report }));
@@ -108,9 +111,19 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
   }, { ceremony: false, label: t.rate, report }));
   const readReport = async () => {
     setReport("…");
-    try { const r = await getReport(vault, 7); setReport(typeof r.text === "string" ? r.text.replace(/\*\*/g, "") : String(r.status ?? t.noReport)); }
+    try { const r = await getReport(vault, 7, lang); setReport(typeof r.text === "string" ? r.text.replace(/\*\*/g, "") : String(r.status ?? t.noReport)); }
     catch { setReport(t.writing); }
   };
+
+  // Laporan yang sedang terbuka diambil ulang dalam bahasa baru saat toggle berubah (relayer `?lang=`).
+  const reportOpen = report !== null;
+  useEffect(() => {
+    if (!reportOpen) return;
+    let cancelled = false;
+    getReport(vault, 7, lang).then((r) => { if (!cancelled && typeof r.text === "string") setReport(r.text.replace(/\*\*/g, "")); }).catch(() => undefined);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hanya saat bahasa berubah
+  }, [lang, vault]);
 
   if (!agents) return <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /> {t.loading}</div>;
   const pending = proposals.filter((p) => p.status === "pending");
@@ -127,7 +140,7 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
           return (
             <li key={a.id} className="rounded-xl border border-slate-900/5 bg-white/70 p-2.5 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-ink">{a.name}</span>
+                <span className="font-semibold text-ink">{nameOf(a)}</span>
                 <span className="flex gap-1">
                   {a.id === "satpam" && <Badge tone="neutral">Chainlink CRE</Badge>}
                   {!team && <Badge tone="accent">{t.community}</Badge>}
@@ -182,7 +195,7 @@ export default function StaffPanel({ city, onDone }: { city: CityView; onDone: (
                 <span className="font-semibold text-ink">{p.plan?.action === "deploy" ? t.deploy : p.plan?.action === "withdraw" ? t.withdraw : t.move} · {p.plan?.amount ? fmtAusd(Number(p.plan.amount) / 1e6) : "?"} AUSD</span>
                 <Badge tone={p.status === "pending" ? "accent" : p.status === "approved" ? "good" : "neutral"}>{t.status[p.status] ?? p.status}</Badge>
               </div>
-              {typeof p.plan?.reason === "string" && <div className="mt-0.5 text-ink-soft">“{p.plan.reason}”</div>}
+              {typeof proposalReason(p, lang) === "string" && <div className="mt-0.5 text-ink-soft">“{proposalReason(p, lang)}”</div>}
               {p.status === "pending" && <button className="btn btn-primary mt-2 !px-2.5 !py-1 text-[11px]" disabled={!!busy} onClick={() => approve(p)}>{t.approve}</button>}
               {busy?.key === `p${p.proposalId}` && <div className="mt-2"><StepList steps={busy.steps} /></div>}
             </div>

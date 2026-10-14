@@ -1,4 +1,5 @@
 import { bytesToHex, hexToBytes, keccak256 } from "viem";
+import { loc } from "./l10n";
 import { getBook, getBookEntry, putBook, type BookMeta } from "./relayer";
 import type { Hex } from "./types";
 import type { WalletApi } from "./wallet";
@@ -75,7 +76,7 @@ export async function sealEntry(key: Uint8Array, id: string, entry: PlanEntry): 
 
 export async function openEntry(key: Uint8Array, id: string, ciphertext: Hex): Promise<PlanEntry> {
   const bytes = hexToBytes(ciphertext);
-  if (bytes[0] !== FORMAT) throw new Error("Unknown strategy book format.");
+  if (bytes[0] !== FORMAT) throw new Error(loc("Unknown strategy book format."));
   const pt = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: bytes.slice(1, 13), additionalData: new TextEncoder().encode(id) },
     await aes(key, "decrypt"),
@@ -99,7 +100,7 @@ export async function writeEntry(wallet: WalletApi, owner: Hex, input: Omit<Plan
     message: { owner, id, ciphertextHash: planHash, nonce: BigInt(nonce) },
   });
   const saved = await putBook({ owner, id, ciphertext, nonce, signature });
-  if (saved.hash.toLowerCase() !== planHash.toLowerCase()) throw new Error("The relayer stored a different ciphertext than the one sent.");
+  if (saved.hash.toLowerCase() !== planHash.toLowerCase()) throw new Error(loc("The relayer stored a different ciphertext than the one sent."));
   return { id, planHash };
 }
 
@@ -127,6 +128,6 @@ export async function readAll(wallet: WalletApi, owner: Hex): Promise<OpenedEntr
 /** Siapa pun: mencocokkan entri yang dibuka di akhir musim (kunci publik dari event `PlanKeyRevealed`). */
 export async function verifyRevealed(owner: Hex, id: string, keyHex: Hex, planHash: Hex): Promise<PlanEntry> {
   const full = await getBookEntry(owner, id);
-  if (keccak256(full.ciphertext).toLowerCase() !== planHash.toLowerCase()) throw new Error("The stored ciphertext does not match the on-chain plan hash.");
+  if (keccak256(full.ciphertext).toLowerCase() !== planHash.toLowerCase()) throw new Error(loc("The stored ciphertext does not match the on-chain plan hash."));
   return openEntry(hexToBytes(keyHex), id, full.ciphertext);
 }

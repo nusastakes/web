@@ -1,3 +1,5 @@
+import { tr } from "../lang";
+
 /**
  * Jam kota dan pola kegiatan harian. Satu hari kota berlangsung beberapa menit; pola diambil dari kebiasaan kota
  * Indonesia: jam sibuk pagi sekitar 07.00–09.30 dan sore 17.00–19.30, makan siang, pasar pagi, pedagang kaki lima
@@ -5,6 +7,10 @@
  */
 
 export type Phase = "Night" | "Dawn" | "Morning rush" | "Morning" | "Lunch" | "Afternoon" | "Evening rush" | "Evening" | "Late night";
+const PHASE_ID: Record<Phase, string> = {
+  "Night": "Jelang tengah malam", "Dawn": "Subuh", "Morning rush": "Jam sibuk pagi", "Morning": "Pagi", "Lunch": "Makan siang", "Afternoon": "Siang",
+  "Evening rush": "Jam sibuk sore", "Evening": "Malam", "Late night": "Dini hari",
+};
 
 const bump = (h: number, at: number, width: number) => Math.exp(-((h - at) ** 2) / (2 * width * width));
 /** Jarak melingkar antarjam (24 jam). */
@@ -47,6 +53,11 @@ export class CityClock {
     if (h < 19.5) return "Evening rush";
     if (h < 22.5) return "Evening";
     return "Night";
+  }
+
+  /** Nama bagian hari dalam bahasa yang sedang dipakai (untuk ditampilkan). */
+  get phaseLabel(): string {
+    return tr(this.phase, PHASE_ID[this.phase]);
   }
 
   /** 0 malam, 1 siang penuh; peralihan halus saat fajar (05.00–06.30) dan senja (17.30–19.00). */

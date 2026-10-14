@@ -107,7 +107,7 @@ export default function TuningSheet({ city, district, onClose, onDone }: Props) 
         {!district.tunable ? (
           <Notice tone="info">{t.notTunable}</Notice>
         ) : !knobs || (!knobs.rewards && !knobs.loop && !knobs.range) ? (
-          <Notice tone="info">{svc?.knobsNote || t.noKnobs}</Notice>
+          <Notice tone="info">{lang === "en" && svc?.knobsNote ? svc.knobsNote : t.noKnobs}</Notice>
         ) : !draft ? (
           <div className="flex items-center gap-2 text-sm text-ink-soft"><Spinner /></div>
         ) : (
@@ -138,7 +138,7 @@ export default function TuningSheet({ city, district, onClose, onDone }: Props) 
                     <p className="text-[11px] leading-relaxed text-ink-soft">{t.loopHint(knobs.loop.borrowApyBps === null ? "?" : fmtBps(knobs.loop.borrowApyBps))}</p>
                   </>
                 ) : (
-                  <p className="text-[11px] leading-relaxed text-ink-soft">{t.loopNo(knobs.loop.reason ?? "LTV 0")}</p>
+                  <p className="text-[11px] leading-relaxed text-ink-soft">{t.loopNo(knobs.loop.reason ? t.reasons[knobs.loop.reason] ?? knobs.loop.reason : "LTV 0")}</p>
                 )}
               </div>
             )}

@@ -1,4 +1,6 @@
 import { RELAYER_URL } from "./config";
+import { loc } from "./l10n";
+import { currentLang, type Lang } from "./lang";
 import type { Hex } from "./types";
 
 export class RelayerError extends Error {
@@ -17,11 +19,11 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new RelayerError("The relayer is not reachable. Deposits and withdrawals need it to pay gas.", 0);
+    throw new RelayerError(loc("The relayer is not reachable. Deposits and withdrawals need it to pay gas."), 0);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new RelayerError((data as { error?: string }).error || `Relayer error (${res.status})`, res.status, (data as { retryAfterSeconds?: number }).retryAfterSeconds);
+    throw new RelayerError((data as { error?: string }).error || loc(`Relayer error (${res.status})`), res.status, (data as { retryAfterSeconds?: number }).retryAfterSeconds);
   }
   return data as T;
 }
@@ -87,11 +89,16 @@ export const getMarketplace = (city?: Hex) => call<{ marketplace: Hex; guardian:
 export interface ProposalInfo {
   proposalId: string; planHash: Hex; txHash?: Hex; status: "pending" | "approved" | "expired" | string;
   plan?: { from?: string; to?: string; amount?: string; reason?: string; [k: string]: unknown };
+  /** Alasan yang sama dalam bahasa Inggris, disusun relayer dari angka rencana (`plan.reason` tetap Indonesia karena ikut hash). */
+  reasonEn?: string;
   [k: string]: unknown;
 }
+/** Alasan usulan Analis dalam bahasa antarmuka. */
+export const proposalReason = (p: ProposalInfo, lang: Lang = currentLang()): string | undefined => (lang === "en" ? p.reasonEn ?? p.plan?.reason : p.plan?.reason);
 export const getProposals = (city: Hex) => call<{ city: Hex; analyst: Hex; proposals: ProposalInfo[] }>(`/proposals/${city}`);
 export const runAnalyst = (city: Hex) => call<{ status: string; [k: string]: unknown }>("/analyst/run", { city });
-export const getReport = (city: Hex, days = 7) => call<{ text?: string; title?: string; [k: string]: unknown }>(`/report/${city}?days=${days}`);
+/** Laporan Humas dalam bahasa antarmuka (relayer `?lang=id|en`). */
+export const getReport = (city: Hex, days = 7, lang: Lang = currentLang()) => call<{ text?: string; title?: string; [k: string]: unknown }>(`/report/${city}?days=${days}&lang=${lang}`);
 export interface LeaderRow { rank: number | null; ranked: boolean; vault: Hex; name: string; community: string; mayor: Hex; tvl: string; returnBps: number; pricePerShare: string; residents: number; createdAt: number }
 export const getLeaderboard = () => call<{ asOf: number; minRankedTvl: string; cities: LeaderRow[] }>("/leaderboard");
 export const getEconomy = () => call<Record<string, unknown>>("/economy");

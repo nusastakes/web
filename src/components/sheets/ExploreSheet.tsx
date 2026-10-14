@@ -113,8 +113,8 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
                 {eco.sectors.slice(0, 8).map((s) => (
                   <li key={s.sector} className="rounded-xl border border-slate-900/5 bg-white/70 px-2.5 py-2 text-xs">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-ink">{s.sector}</span>
-                      <span className="text-ink-soft">{usd(s.fees24h)} / 24h · {usd(s.fees30d)} / 30d</span>
+                      <span className="font-semibold text-ink">{t.sectors[s.sector] ?? s.sector}</span>
+                      <span className="text-ink-soft">{usd(s.fees24h)} / {t.h24} · {usd(s.fees30d)} / {t.d30}</span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-900/5">
                       <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(2, (s.fees30d / Math.max(1, eco.sectors[0].fees30d)) * 100)}%` }} />
@@ -124,7 +124,7 @@ export default function ExploreSheet({ onClose, onPick, me }: { onClose: () => v
                 ))}
               </ul>
               <p className="text-[10.5px] leading-snug text-ink-soft/80">
-                {eco.note} {t.source}: <a className="text-accent hover:underline" href={eco.sourceUrl} target="_blank" rel="noreferrer">{eco.source}</a>, {t.fetched} {new Date(eco.fetchedAt * 1000).toLocaleString(loc, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.{eco.stale ? t.stale : ""}
+                {t.ecoNote || eco.note} {t.source}: <a className="text-accent hover:underline" href={eco.sourceUrl} target="_blank" rel="noreferrer">{eco.source}</a>, {t.fetched} {new Date(eco.fetchedAt * 1000).toLocaleString(loc, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.{eco.stale ? t.stale : ""}
               </p>
               <Badge tone="neutral">{t.badge}</Badge>
             </>

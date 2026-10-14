@@ -5,6 +5,8 @@ import { createWalletClient, type LocalAccount } from "viem";
 import type { Secp256k1SigningSession } from "@category-labs/mera";
 import brand from "./brand.json";
 import { monadTestnet, rpcTransport } from "./config";
+import { loc } from "./l10n";
+import { tr } from "./lang";
 import { markCeremony, markStart } from "./metrics";
 import type { Hex } from "./types";
 
@@ -215,7 +217,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(async (label: string, fn: () => Promise<void>) => {
     setError(undefined);
-    setBusyLabel(label);
+    setBusyLabel(loc(label));
     setPhase("busy");
     try {
       await fn();
@@ -234,7 +236,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const day = new Date().toISOString().slice(0, 10);
     const created = await createPasskeyWithPrfOutput({
       rp: { id: location.hostname, name: brand.name },
-      user: { name: `${brand.name.toLowerCase()}-${day}`, displayName: `${brand.name} account (${day})` },
+      user: { name: `${brand.name.toLowerCase()}-${day}`, displayName: tr(`${brand.name} account (${day})`, `Akun ${brand.name} (${day})`) },
     });
     markCeremony();
     await startFrom(created.prfOutput, { credentialId: created.credentialId, transports: created.transports as string[] | undefined });
@@ -279,7 +281,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const withCeremony = useCallback(async <T,>(label: string, fn: (account: LocalAccount) => Promise<T>): Promise<T> => {
     const { getPasskeyPrfOutput } = await import("@category-labs/mera");
     const known = readStored();
-    setBusyLabel(label);
+    setBusyLabel(loc(label));
     let fresh: Opened | undefined;
     try {
       const got = await getPasskeyPrfOutput({
@@ -289,7 +291,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       markCeremony();
       fresh = await openSession(got.prfOutput);
       if (address && fresh.account.address.toLowerCase() !== address.toLowerCase()) {
-        throw new Error("This passkey belongs to a different account than the one you are signed in with.");
+        throw new Error(loc("This passkey belongs to a different account than the one you are signed in with."));
       }
       return await fn(fresh.account);
     } finally {
@@ -313,7 +315,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (!bookRef.current) {
       const { getPasskeyPrfOutput } = await import("@category-labs/mera");
       const known = readStored();
-      setBusyLabel("Unlock your strategy book with your passkey…");
+      setBusyLabel(loc("Unlock your strategy book with your passkey…"));
       try {
         const got = await getPasskeyPrfOutput({
           rpId: location.hostname,

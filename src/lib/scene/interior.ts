@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { distToPolygonEdge, pointInPolygon } from "./geometry";
 import type { Floater, Tone } from "./life";
 import { Layered, box, merge, part, toonRamp, type Model } from "./props";
+import { term, tr } from "../lang";
 
 /**
  * Isi gedung saat gedung diklik: gedung "dibelah" (setengah yang menghadap kamera disembunyikan di shader) dan
@@ -63,12 +64,14 @@ interface Actor {
   role?: string;
 }
 
-const LABELS: Record<Program, string> = {
-  lobby: "Lobby", office: "Open office", meeting: "Meeting room", pantry: "Pantry", trading: "Fund desk", gym: "Gym", vault: "Vault room",
-  apartment: "Apartments", shop: "Shop", warung: "Warung", storage: "Storage",
-  classroom: "Classroom", prayer: "Prayer hall", clinic: "Clinic",
-  mayor: "Mayor's office", council: "City council room", aiStaff: "AI staff room", service: "Citizen services",
+/** Nama ruang per fungsi lantai: [Inggris, Indonesia]; dipilih saat ditampilkan. */
+const LABELS: Record<Program, [string, string]> = {
+  lobby: ["Lobby", "Lobi"], office: ["Open office", "Kantor terbuka"], meeting: ["Meeting room", "Ruang rapat"], pantry: ["Pantry", "Pantri"], trading: ["Fund desk", "Meja dana"], gym: ["Gym", "Pusat kebugaran"], vault: ["Vault room", "Ruang brankas"],
+  apartment: ["Apartments", "Apartemen"], shop: ["Shop", "Toko"], warung: ["Food stall", "Warung"], storage: ["Storage", "Gudang"],
+  classroom: ["Classroom", "Ruang kelas"], prayer: ["Prayer hall", "Ruang ibadah"], clinic: ["Clinic", "Klinik"],
+  mayor: ["Mayor's office", "Ruang walikota"], council: ["City council room", "Ruang dewan kota"], aiStaff: ["AI staff room", "Ruang staf AI"], service: ["Citizen services", "Layanan warga"],
 };
+const floorLabel = (pr: Program) => tr(...LABELS[pr]);
 
 const SHIRTS = ["#3f6bff", "#7a5cff", "#10b3a3", "#f59e0b", "#ec4899", "#ffffff", "#94a3d8", "#e8553d"].map((c) => new THREE.Color(c));
 const SKINS = ["#f1c9a5", "#d9a37a", "#b97a56", "#8d5a3b", "#f6d6bd"].map((c) => new THREE.Color(c));
@@ -194,7 +197,8 @@ export class BuildingInterior {
       } else if (b.kind === "shop") {
         pr = k === 0 ? "shop" : k === 1 ? "storage" : "apartment";
       } else {
-        pr = /masjid|gereja/.test(name) ? (k === 0 ? "prayer" : "office") : /sd |smp|kampus|perpus/.test(name) ? (k === 0 ? "lobby" : "classroom") : /puskesmas|klinik/.test(name) ? (k === 0 ? "clinic" : "office") : k === 0 ? "lobby" : "office";
+        // Nama tempat bisa berbahasa Inggris atau Indonesia (ikut toggle), jadi kata kuncinya dua bahasa.
+        pr = /masjid|gereja|mosque|church/.test(name) ? (k === 0 ? "prayer" : "office") : /sd |smp|kampus|perpus|school|campus|library/.test(name) ? (k === 0 ? "lobby" : "classroom") : /puskesmas|klinik|clinic|health/.test(name) ? (k === 0 ? "clinic" : "office") : k === 0 ? "lobby" : "office";
       }
       out.push(pr);
     }
@@ -299,7 +303,7 @@ export class BuildingInterior {
     for (let k = 0; k < F; k++) {
       const y = k * fh + 0.02;
       const pr = progs[k];
-      const floor: Floor = { level: k, y, program: pr, label: LABELS[pr], doing: () => this.doingOf(pr, k), cx: this.cx, cz: this.cz };
+      const floor: Floor = { level: k, y, program: pr, label: LABELS[pr][0], doing: () => this.doingOf(pr, k), cx: this.cx, cz: this.cz };
       this.floors.push(floor);
       if (budget <= 0) continue;
       const rot = this.rnd() < 0.5 ? 0 : Math.PI / 2;
@@ -309,7 +313,7 @@ export class BuildingInterior {
           pts.forEach(([x, z], i) => {
             put("desk", x, y, z, rot); put("chair", x + Math.sin(rot) * 0.0, y, z + (rot ? 0 : 0.75), rot);
             budget -= 2;
-            if (pr === "aiStaff") this.addActor(floor, x, z + 0.75, rot + Math.PI, "type", ["Satpam (AI guard)", "Analyst (AI)", "Humas (AI)"][i] ?? "AI staff", [0xef4444, 0x7a5cff, 0x10b981][i]);
+            if (pr === "aiStaff") this.addActor(floor, x, z + 0.75, rot + Math.PI, "type", [term("guard"), term("analyst"), term("pr")][i] ?? term("aiStaff"), [0xef4444, 0x7a5cff, 0x10b981][i]);
             else if (this.rnd() < 0.7) this.addActor(floor, x, z + 0.75, rot + Math.PI, "type", pr === "trading" ? "Fund analyst" : "Office worker", undefined, () => this.hour >= 8 && this.hour < 18.5);
           });
           if (pr === "trading") { const c = this.inside(2.5); if (c) { put("board", c[0], y, c[1], rot); this.screen(floor, c[0], y, c[1], rot, "fund"); } }
@@ -340,8 +344,8 @@ export class BuildingInterior {
           put("plant", c[0] + 2.2, y, c[1] + 1.5); put("sofa", c[0] - 2.4, y, c[1] + 2.2, Math.PI / 2);
           this.addActor(floor, c[0], c[1] + 0.75, rot + Math.PI, "type", "Mayor", 0xf5b301, () => this.hour >= 7.5 && this.hour < 21);
           // Analis datang mempresentasikan usulan; Satpam melapor saat evakuasi.
-          this.addActor(floor, c[0] + 1.2, c[1] + 1.6, rot + Math.PI * 0.8, "present", "Analyst (AI) presenting a proposal", 0x7a5cff, () => this.recent("propose", 150));
-          this.addActor(floor, c[0] - 1.2, c[1] + 1.6, rot + Math.PI * 1.2, "stand", "Satpam (AI) reporting", 0xef4444, () => this.recent("alert", 90));
+          this.addActor(floor, c[0] + 1.2, c[1] + 1.6, rot + Math.PI * 0.8, "present", `${term("analyst")} (AI)`, 0x7a5cff, () => this.recent("propose", 150));
+          this.addActor(floor, c[0] - 1.2, c[1] + 1.6, rot + Math.PI * 1.2, "stand", `${term("guard")} (AI)`, 0xef4444, () => this.recent("alert", 90));
           budget -= 8;
           break;
         }
@@ -518,41 +522,41 @@ export class BuildingInterior {
     const a = this.latest(["transfer", "propose", "approve", "alert", "harvest"], 160);
     switch (pr) {
       case "mayor":
-        if (h < 7.5 || h >= 21) return "The mayor has gone home";
-        if (this.recent("propose", 150)) return "The AI Analyst presents a proposal to the mayor";
-        if (this.recent("alert", 90)) return "Satpam reports an evacuation to the mayor";
-        if (this.recent("seal", 120)) return "Mayor writes a sealed plan in the strategy book";
-        if (this.recent("reveal", 150)) return "Mayor reveals a sealed plan to the public";
-        if (this.recent("hire", 150)) return "Mayor welcomes new AI staff";
-        if (this.recent("deputy", 150)) return "Mayor hands day-to-day work to the deputy key";
-        if (this.recent("fee", 150)) return "Mayor sets a new fee for the city";
-        return a ? `Mayor follows up: ${a.text}` : "Mayor reviews the city's allocation";
+        if (h < 7.5 || h >= 21) return tr("The mayor has gone home", "Walikota sudah pulang");
+        if (this.recent("propose", 150)) return tr(`The AI ${term("analyst", "en")} presents a proposal to the mayor`, `${term("analyst", "id")} AI mempresentasikan usulan ke walikota`);
+        if (this.recent("alert", 90)) return tr(`The ${term("guard", "en")} reports an evacuation to the mayor`, `${term("guard", "id")} melaporkan evakuasi ke walikota`);
+        if (this.recent("seal", 120)) return tr("Mayor writes a sealed plan in the strategy book", "Walikota menulis rencana tersegel di buku strategi");
+        if (this.recent("reveal", 150)) return tr("Mayor reveals a sealed plan to the public", "Walikota membuka rencana tersegel ke publik");
+        if (this.recent("hire", 150)) return tr("Mayor welcomes new AI staff", "Walikota menyambut staf AI baru");
+        if (this.recent("deputy", 150)) return tr("Mayor hands day-to-day work to the deputy key", "Walikota menyerahkan kerja harian ke kunci wakil");
+        if (this.recent("fee", 150)) return tr("Mayor sets a new fee for the city", "Walikota menetapkan fee baru untuk kota");
+        return a ? tr(`Mayor follows up: ${a.text}`, `Walikota menindaklanjuti: ${a.text}`) : tr("Mayor reviews the city's allocation", "Walikota meninjau alokasi kota");
       case "council": {
         const r = this.latest(["reveal"], 200);
-        if (r) return `Public session: ${r.text}`;
-        return this.meetingActive("council") ? `Council meeting: ${a ? a.text : "weekly city budget review"}` : "Empty, next meeting later";
+        if (r) return tr(`Public session: ${r.text}`, `Sidang terbuka: ${r.text}`);
+        return this.meetingActive("council") ? `${tr("Council meeting", "Rapat dewan")}: ${a ? a.text : tr("weekly city budget review", "tinjauan anggaran kota mingguan")}` : tr("Empty, next meeting later", "Kosong, rapat berikutnya nanti");
       }
       case "meeting": {
         // Hanya ruang rapat terbawah yang membahas dana baru; yang lain rapat tim biasa.
         const first = this.floors.find((f) => f.program === "meeting")?.level === level;
         const mine = this.agenda().filter((q) => q.kind === "transfer" && q.district === this.brief.district.id && this.t - q.at < 160).sort((p, q) => q.at - p.at)[0];
-        return mine && first ? `Briefing on new funds: ${mine.text}` : this.meetingActive("meeting") ? (level % 2 ? "Team meeting" : "Client call") : "Empty";
+        return mine && first ? `${tr("Briefing on new funds", "Pembahasan dana baru")}: ${mine.text}` : this.meetingActive("meeting") ? (level % 2 ? tr("Team meeting", "Rapat tim") : tr("Client call", "Telepon klien")) : tr("Empty", "Kosong");
       }
-      case "aiStaff": return this.recent("hire", 150) ? "New AI staff setting up their desks" : this.recent("fire", 150) ? "An AI staff member packs up and leaves" : this.recent("alert", 90) ? "Alarm: Satpam is evacuating a district" : this.recent("propose", 150) ? "Analyst drafted a proposal for the mayor" : "Satpam watches the protocols, Analyst models yields, Humas writes the weekly report";
-      case "service": return h >= 8 && h < 16 ? (this.recent("deposit", 120) || this.recent("withdraw", 120) ? "Busy: residents depositing and withdrawing" : "Residents asking about their savings") : "Closed";
-      case "trading": return this.recent("transfer", 160) ? "Fund desk rebalancing the district" : `Watching ${this.brief.district.label} yields`;
-      case "vault": return "Crates of AUSD held by this district";
-      case "office": return h >= 8 && h < 18.5 ? "People at work" : "Lights off, office empty";
-      case "lobby": return h >= 7 && h < 21 ? "Visitors coming and going" : "Quiet lobby";
-      case "pantry": return h >= 9.5 && h < 16 ? "Coffee break" : "Closed";
-      case "warung": return (h >= 11 && h < 14) || (h >= 18 && h < 22) ? "Busy mealtime" : "Cook preparing food";
-      case "shop": return h >= 8 && h < 21.5 ? "Open, shoppers browsing" : "Closed, shutter down";
-      case "apartment": return h >= 22.5 || h < 5.5 ? "Residents sleeping" : h >= 18 ? "Families watching TV" : h < 8 ? "Breakfast and getting ready" : "Most residents are out";
-      case "classroom": return h >= 7 && h < 13.5 ? "Class in session" : "Classroom empty";
-      case "prayer": return [4.7, 12.1, 15.3, 18.0, 19.3].some((x) => h >= x && h < x + 0.45) ? "Congregational prayer" : "Quiet";
-      case "clinic": return "Nurse checking on patients";
-      case "gym": return (h >= 6 && h < 9) || (h >= 17 && h < 21) ? "Workout hour" : "Almost empty";
-      default: return `Floor ${level + 1}`;
+      case "aiStaff": return this.recent("hire", 150) ? tr("New AI staff setting up their desks", "Staf AI baru menata meja") : this.recent("fire", 150) ? tr("An AI staff member packs up and leaves", "Seorang staf AI berkemas dan pergi") : this.recent("alert", 90) ? tr(`Alarm: the ${term("guard", "en")} is evacuating a district`, `Alarm: ${term("guard", "id")} sedang mengevakuasi distrik`) : this.recent("propose", 150) ? tr(`The ${term("analyst", "en")} drafted a proposal for the mayor`, `${term("analyst", "id")} menyusun usulan untuk walikota`) : tr(`The ${term("guard", "en")} watches the protocols, the ${term("analyst", "en")} models yields, ${term("pr", "en")} writes the weekly report`, `${term("guard", "id")} mengawasi protokol, ${term("analyst", "id")} menghitung imbal hasil, ${term("pr", "id")} menulis laporan mingguan`);
+      case "service": return h >= 8 && h < 16 ? (this.recent("deposit", 120) || this.recent("withdraw", 120) ? tr("Busy: residents depositing and withdrawing", "Ramai: penduduk menyetor dan menarik") : tr("Residents asking about their savings", "Penduduk bertanya soal tabungannya")) : tr("Closed", "Tutup");
+      case "trading": return this.recent("transfer", 160) ? tr("Fund desk rebalancing the district", "Meja dana menata ulang distrik") : tr(`Watching ${this.brief.district.label} yields`, `Memantau imbal hasil ${this.brief.district.label}`);
+      case "vault": return tr("Crates of AUSD held by this district", "Peti AUSD milik distrik ini");
+      case "office": return h >= 8 && h < 18.5 ? tr("People at work", "Orang sedang bekerja") : tr("Lights off, office empty", "Lampu mati, kantor kosong");
+      case "lobby": return h >= 7 && h < 21 ? tr("Visitors coming and going", "Tamu datang dan pergi") : tr("Quiet lobby", "Lobi sepi");
+      case "pantry": return h >= 9.5 && h < 16 ? tr("Coffee break", "Rehat kopi") : tr("Closed", "Tutup");
+      case "warung": return (h >= 11 && h < 14) || (h >= 18 && h < 22) ? tr("Busy mealtime", "Jam makan ramai") : tr("Cook preparing food", "Juru masak menyiapkan makanan");
+      case "shop": return h >= 8 && h < 21.5 ? tr("Open, shoppers browsing", "Buka, pembeli melihat-lihat") : tr("Closed, shutter down", "Tutup, rolling door turun");
+      case "apartment": return h >= 22.5 || h < 5.5 ? tr("Residents sleeping", "Penghuni tidur") : h >= 18 ? tr("Families watching TV", "Keluarga menonton TV") : h < 8 ? tr("Breakfast and getting ready", "Sarapan dan bersiap") : tr("Most residents are out", "Sebagian besar penghuni sedang keluar");
+      case "classroom": return h >= 7 && h < 13.5 ? tr("Class in session", "Kelas sedang berlangsung") : tr("Classroom empty", "Kelas kosong");
+      case "prayer": return [4.7, 12.1, 15.3, 18.0, 19.3].some((x) => h >= x && h < x + 0.45) ? tr("Congregational prayer", "Ibadah berjamaah") : tr("Quiet", "Sepi");
+      case "clinic": return tr("Nurse checking on patients", "Perawat memeriksa pasien");
+      case "gym": return (h >= 6 && h < 9) || (h >= 17 && h < 21) ? tr("Workout hour", "Jam olahraga") : tr("Almost empty", "Hampir kosong");
+      default: return tr(`Floor ${level + 1}`, `Lantai ${level + 1}`);
     }
   }
 
@@ -626,7 +630,7 @@ export class BuildingInterior {
       c.font = "bold 16px system-ui, sans-serif";
       c.textAlign = "left";
       if (s.kind === "mayor" || s.kind === "fund") {
-        c.fillText(s.kind === "mayor" ? "CITY ALLOCATION" : `${this.brief.district.label.toUpperCase()}`, 10, 22);
+        c.fillText(s.kind === "mayor" ? tr("CITY ALLOCATION", "ALOKASI KOTA") : `${this.brief.district.label.toUpperCase()}`, 10, 22);
         alloc.slice(0, 4).forEach((d, i) => {
           c.fillStyle = "#2a3366";
           c.fillRect(10, 34 + i * 22, 236, 14);
@@ -638,10 +642,10 @@ export class BuildingInterior {
         });
         if (a) { c.fillStyle = "#d8f59a"; c.font = "12px system-ui, sans-serif"; c.fillText(a.text.slice(0, 38), 10, 136); }
       } else {
-        c.fillText(a ? "AGENDA" : "MEETING", 10, 24);
+        c.fillText(a ? "AGENDA" : tr("MEETING", "RAPAT"), 10, 24);
         c.fillStyle = "#d8f59a";
         c.font = "bold 14px system-ui, sans-serif";
-        const text = a ? a.text : "Weekly city budget review";
+        const text = a ? a.text : tr("Weekly city budget review", "Tinjauan anggaran kota mingguan");
         const words = text.split(" ");
         let line = "", y = 52;
         for (const w of words) {
@@ -662,20 +666,20 @@ export class BuildingInterior {
     return pick.map((f) => {
       v.set(this.lx || this.cx, f.y + 2.2, this.lz || this.cz).project(camera);
       const tone: Tone = f.program === "mayor" ? "gold" : f.program === "aiStaff" && this.recent("alert", 90) ? "red" : f.program === "council" || f.program === "meeting" ? "violet" : "blue";
-      return { id: `floor${f.level}`, x: (v.x * 0.5 + 0.5) * rect.w, y: (-v.y * 0.5 + 0.5) * rect.h, visible: v.z > -1 && v.z < 1, text: `Fl ${f.level + 1} · ${f.label}`, tone };
+      return { id: `floor${f.level}`, x: (v.x * 0.5 + 0.5) * rect.w, y: (-v.y * 0.5 + 0.5) * rect.h, visible: v.z > -1 && v.z < 1, text: `${tr("Fl", "Lt")} ${f.level + 1} · ${floorLabel(f.program)}`, tone };
     });
   }
 
   info(): InteriorInfo {
     const b = this.brief;
-    const kindName = b.kind === "hall" ? "Town hall" : b.kind === "office" ? "Office tower" : b.kind === "home" ? "Housing" : b.kind === "food" ? "Food stall building" : b.kind === "shop" ? "Shophouse" : "Public building";
+    const kindName = b.kind === "hall" ? term("townHall") : b.kind === "office" ? tr("Office tower", "Gedung perkantoran") : b.kind === "home" ? tr("Housing", "Hunian") : b.kind === "food" ? tr("Food stall building", "Gedung warung") : b.kind === "shop" ? tr("Shophouse", "Ruko") : tr("Public building", "Gedung umum");
     const occupants = this.actors.filter((a) => (a.when ? a.when() : true)).length;
     const featured = this.floors.filter((f) => f.program !== "office" && f.program !== "apartment" || f.level === 1).slice(-6).reverse();
     const agenda = (b.kind === "hall" ? this.agenda() : this.agenda().filter((a) => a.district === b.district.id)).slice(-4).reverse().map((a) => a.text);
     return {
-      title: b.kind === "hall" ? `Balai Kota · ${b.name}` : b.name,
-      subtitle: `${kindName} · ${this.floors.length} floors · ${b.district.label}`,
-      floors: featured.map((f) => ({ level: f.level + 1, label: f.label, doing: f.doing() })),
+      title: b.kind === "hall" ? `${term("townHall")} · ${b.name}` : b.name,
+      subtitle: `${kindName} · ${this.floors.length} ${tr("floors", "lantai")} · ${b.district.label}`,
+      floors: featured.map((f) => ({ level: f.level + 1, label: floorLabel(f.program), doing: f.doing() })),
       occupants,
       agenda,
     };

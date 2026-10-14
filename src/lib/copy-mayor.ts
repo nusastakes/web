@@ -50,6 +50,8 @@ const EN = {
     cities: "cities", mayors: "mayors", residents: "residents", allCommunities: "All communities", reading: "Reading the city index…",
     yours: " · yours", noCommunity: "No community", mayor: "mayor", resident: (n: number) => `${n} resident${n === 1 ? "" : "s"}`, none: "No cities in this community yet.",
     footnote: (min: string) => `Cities with less than ${min} AUSD are listed but not ranked. Return is the change in share price since founding; yield on testnet is simulated.`,
+    /** Nama sektor DefiLlama dan catatan sumber dari relayer berbahasa Inggris; di ID diterjemahkan, di EN dipakai apa adanya. */
+    sectors: {} as Record<string, string>, ecoNote: "", h24: "24h", d30: "30d",
     readingEco: "Reading DefiLlama…", fees24: "fees 24h", fees7: "fees 7d", fees30: "fees 30d", protocols: (n: number) => `${n} protocols`, top: "top",
     source: "Source", fetched: "fetched", stale: " The figures are stale.", badge: "Mainnet data, for the mayor's decisions",
   },
@@ -117,6 +119,7 @@ const EN = {
     status: { pending: "pending", approved: "approved", rejected: "rejected", expired: "expired" } as Record<string, string>,
     msgs: { proposed: "The Analyst sent a proposal. Approve it below.", "nothing-to-do": "The Analyst sees nothing worth moving right now.", "not-granted": "Hire the Analyst first.", pending: "A proposal is already waiting for you.", cooldown: "The Analyst looked at this city a moment ago. Try again in a few minutes." } as Record<string, string>,
     analyst: "Analyst", noReport: "No report yet.", writing: "The weekly report is still being written. Try again in a minute.",
+    signInFirst: "Sign in first.",
   },
   book: {
     intro: "Each plan you write when moving funds is encrypted on this device with a key that only your passkey can recreate, on any device. The relayer keeps the ciphertext; the chain keeps its fingerprint. Reveal one entry at the end of the season and anyone can check you wrote it before the result.",
@@ -134,6 +137,16 @@ const ID: typeof EN = {
     cities: "kota", mayors: "walikota", residents: "penduduk", allCommunities: "Semua komunitas", reading: "Membaca indeks kota…",
     yours: " · milik Anda", noCommunity: "Tanpa komunitas", mayor: "walikota", resident: (n) => `${n} penduduk`, none: "Belum ada kota di komunitas ini.",
     footnote: (min) => `Kota dengan dana kurang dari ${min} AUSD tetap ditampilkan tapi tidak diberi peringkat. Imbal hasil adalah perubahan harga saham kota sejak didirikan; bunga di testnet adalah simulasi.`,
+    sectors: {
+      Lending: "Pinjaman", "Uncollateralized Lending": "Pinjaman tanpa jaminan", Dexs: "Bursa terdesentralisasi (DEX)", Chain: "Jaringan", "Risk Curators": "Kurator risiko",
+      "Onchain Capital Allocator": "Pengelola modal onchain", Derivatives: "Derivatif", Launchpad: "Peluncur token", "Liquid Staking": "Liquid staking", "DEX Aggregator": "Agregator DEX",
+      Yield: "Imbal hasil", RWA: "Aset dunia nyata (RWA)", "Trading App": "Aplikasi trading", "Gamified Mining": "Penambangan bergaya game", Bridge: "Jembatan", "Bridge Aggregator": "Agregator jembatan",
+      "Bridge Aggregators": "Agregator jembatan", Payments: "Pembayaran", Wallets: "Dompet", "Cross Chain Bridge": "Jembatan lintas chain", "Yield Aggregator": "Agregator imbal hasil",
+      "Prediction Market": "Pasar prediksi", "Luck Games": "Permainan untung-untungan", Oracle: "Oracle", Interface: "Antarmuka", Foundation: "Yayasan", SoFi: "Keuangan sosial (SoFi)",
+      "NFT Marketplace": "Pasar NFT", "Liquid Restaking": "Liquid restaking", CDP: "Pinjaman berjaminan (CDP)",
+    } as Record<string, string>,
+    h24: "24 jam", d30: "30 hari",
+    ecoNote: "Fee menurut hitungan DefiLlama per protokol; untuk pinjaman dan vault kurator, angka ini adalah imbal hasil yang dibayar ke penyetor, bukan pendapatan protokol.",
     readingEco: "Membaca DefiLlama…", fees24: "fee 24 jam", fees7: "fee 7 hari", fees30: "fee 30 hari", protocols: (n) => `${n} protokol`, top: "teratas",
     source: "Sumber", fetched: "diambil", stale: " Angkanya sudah usang.", badge: "Data mainnet, untuk keputusan walikota",
   },
@@ -201,6 +214,7 @@ const ID: typeof EN = {
     status: { pending: "menunggu", approved: "disetujui", rejected: "ditolak", expired: "kedaluwarsa" },
     msgs: { proposed: "Analis mengirim usulan. Setujui di bawah.", "nothing-to-do": "Analis tidak melihat yang layak dipindahkan saat ini.", "not-granted": "Sewa Analis dulu.", pending: "Sudah ada usulan yang menunggu Anda.", cooldown: "Analis baru saja memeriksa kota ini. Coba lagi beberapa menit lagi." },
     analyst: "Analis", noReport: "Belum ada laporan.", writing: "Laporan mingguan masih ditulis. Coba lagi semenit lagi.",
+    signInFirst: "Masuk dulu.",
   },
   book: {
     intro: "Setiap rencana yang Anda tulis saat memindahkan dana dienkripsi di perangkat ini dengan kunci yang hanya bisa dibuat ulang oleh passkey Anda, di perangkat mana pun. Relayer menyimpan teks sandinya; chain menyimpan sidik jarinya. Buka satu catatan di akhir musim dan siapa pun bisa memeriksa bahwa Anda menulisnya sebelum hasilnya.",
